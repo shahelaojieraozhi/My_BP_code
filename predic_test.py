@@ -23,7 +23,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
 from resnet18_1D import resnet18_1d
-from PPG2BP_Dataset import PPG2BPDataset
+from PPG2BP_Dataset_v2 import PPG2BPDataset
 from Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
 
 warnings.filterwarnings("ignore")
@@ -31,6 +31,18 @@ warnings.filterwarnings("ignore")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(666)
 torch.cuda.manual_seed(666)
+
+
+def inv_normalize(sbp_arr, dbp_arr):
+    sbp_min = 40
+    sbp_max = 200
+    dbp_min = 40
+    dbp_max = 120
+
+    sbp_arr = sbp_arr * (sbp_max - sbp_min) + sbp_min
+    dbp_arr = dbp_arr * (dbp_max - dbp_min) + dbp_min
+
+    return sbp_arr, dbp_arr
 
 
 def test():
@@ -53,31 +65,33 @@ def test():
     model = resnet_1d.to(device)
     # model.load_state_dict(torch.load('save/cnn_202307111750/best_w.pth')['state_dict'])     # 18
     # model.load_state_dict(torch.load('save/cnn_202307120933/best_w.pth')['state_dict'])     # 34
-    model.load_state_dict(torch.load('save/cnn_202307121039/best_w.pth')['state_dict'])     # 50
+    model.load_state_dict(torch.load('save/cnn_202307121039/best_w.pth')['state_dict'])  # 50
 
     model.eval()
     loss_meter, it_count = 0, 0
     test_batch_idx = 0
+
     with torch.no_grad():
-        for (ppg, bp) in test_loader:
+        for (ppg, sbp, dbp) in test_loader:
             ppg = ppg.to(device)
-            ppg = ppg.unsqueeze(dim=0)
-            ppg = torch.transpose(ppg, 1, 0)
             bp_hat = model(ppg).cpu()
-            dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+            sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
 
             dbp_hat_arr = dbp_hat.numpy()
             sbp_hat_arr = sbp_hat.numpy()
 
-            sbp_arr = bp[:, 0].numpy()
-            dbp_arr = bp[:, 1].numpy()
+            sbp_arr = sbp.numpy()
+            dbp_arr = dbp.numpy()
+
+            sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
+            sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
 
             table_arr = np.vstack((dbp_hat_arr, sbp_hat_arr, sbp_arr, dbp_arr)).T
             pd.DataFrame(table_arr).to_csv("./predict_test/res_50_20/predict_test_{}.csv".format(test_batch_idx),
                                            header=['dbp_hat_arr', 'sbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
 
-            loss_dbp = F.mse_loss(dbp_hat, bp[:, 0])
-            loss_sbp = F.mse_loss(sbp_hat, bp[:, 1])
+            loss_sbp = F.mse_loss(sbp_hat, sbp)
+            loss_dbp = F.mse_loss(dbp_hat, dbp)
 
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
@@ -88,6 +102,7 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    test_loss = test()
+    print(test_loss)
 
 # tensorboard --logdir=cnn_202305061217 --port=6007

@@ -42,9 +42,6 @@ class PPG2BPDataset(Dataset):
             # subject_idx = f.get('/subject_idx')
 
     def __getitem__(self, index):
-        # if index % 1000 == 0 and index != 0:
-        #     self.file_count += 1
-
         self.file_count = index // 1000
         index = index - 1000 * self.file_count
 
@@ -70,8 +67,8 @@ if __name__ == '__main__':
     b = data[0]
 
 """
-    SBP_min = 40
-    SBP_max = 200
-    DBP_min = 40
-    DBP_max = 120
+SBP_min = 40
+SBP_max = 200
+DBP_min = 40
+DBP_max = 120
 """

@@ -67,17 +67,14 @@ def val_epoch(model, optimizer, val_dataloader):
     model.eval()
     loss_meter, it_count = 0, 0
     with torch.no_grad():
-        for (ppg, bp) in val_dataloader:
+        for (ppg, sbp, dbp) in val_dataloader:
             ppg = ppg.to(device)
-            ppg = ppg.unsqueeze(dim=0)
-            ppg = torch.transpose(ppg, 1, 0)
             bp_hat = model(ppg).cpu()
-            dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+            sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
             optimizer.zero_grad()
 
-            loss_dbp = F.mse_loss(dbp_hat, bp[:, 0])
-            loss_sbp = F.mse_loss(sbp_hat, bp[:, 1])
-
+            loss_sbp = F.mse_loss(sbp_hat, sbp)
+            loss_dbp = F.mse_loss(dbp_hat, dbp)
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
             it_count += 1
@@ -91,7 +88,7 @@ def train():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-n", "--n_epochs", type=int, default=20, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=1024, help="batch size of training")
+    parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='cnn', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     opt = parser.parse_args()
