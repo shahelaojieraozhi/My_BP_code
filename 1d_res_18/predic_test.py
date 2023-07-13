@@ -3,7 +3,7 @@
 @Project ：My_BP_code 
 @Time    : 2023/7/11 14:45
 @Author  : Rao Zhi
-@File    : predic_test.py
+@File    : predict_test.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 

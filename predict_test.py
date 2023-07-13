@@ -3,7 +3,7 @@
 @Project ：My_BP_code 
 @Time    : 2023/7/11 14:45
 @Author  : Rao Zhi
-@File    : predic_test.py
+@File    : predict_test.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 
@@ -60,12 +60,12 @@ def test():
     test_loader = DataLoader(test_data, batch_size=opt.batch, shuffle=True, num_workers=1)
 
     "model"
-    # resnet_1d = resnet18_1d()
-    resnet_1d = resnet50()
+    resnet_1d = resnet18_1d()
+    # resnet_1d = resnet50()
     model = resnet_1d.to(device)
     # model.load_state_dict(torch.load('save/cnn_202307111750/best_w.pth')['state_dict'])     # 18
     # model.load_state_dict(torch.load('save/cnn_202307120933/best_w.pth')['state_dict'])     # 34
-    model.load_state_dict(torch.load('save/cnn_202307121039/best_w.pth')['state_dict'])  # 50
+    model.load_state_dict(torch.load('save/add_normal_res_18/best_w.pth')['state_dict'])  # 50
 
     model.eval()
     loss_meter, it_count = 0, 0
@@ -86,9 +86,9 @@ def test():
             sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
             sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
 
-            table_arr = np.vstack((dbp_hat_arr, sbp_hat_arr, sbp_arr, dbp_arr)).T
-            pd.DataFrame(table_arr).to_csv("./predict_test/res_50_20/predict_test_{}.csv".format(test_batch_idx),
-                                           header=['dbp_hat_arr', 'sbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
+            table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr,  sbp_arr, dbp_arr)).T
+            pd.DataFrame(table_arr).to_csv("./predict_test/res_normal_18/predict_test_{}.csv".format(test_batch_idx),
+                                           header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
 
             loss_sbp = F.mse_loss(sbp_hat, sbp)
             loss_dbp = F.mse_loss(dbp_hat, dbp)

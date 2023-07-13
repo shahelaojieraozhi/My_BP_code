@@ -20,8 +20,8 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
-from resnet18_1D import resnet18_1d
-# from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
+# from resnet18_1D import resnet18_1d
+from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset_v2 import PPG2BPDataset
 
 warnings.filterwarnings("ignore")
@@ -87,14 +87,15 @@ def train():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-n", "--n_epochs", type=int, default=20, help="number of epochs of training")
+    parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
     parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='cnn', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     opt = parser.parse_args()
 
     "model"
-    resnet_1d = resnet18_1d()
+    # resnet_1d = resnet18_1d()
+    resnet_1d = resnet50()
     model = resnet_1d.to(device)
 
     model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
@@ -114,7 +115,7 @@ def train():
     lr = 1e-3
     start_epoch = 1
     stage = 1
-    step = [10, 15]
+    step = [200, 150]
 
     states = []
 
@@ -146,7 +147,7 @@ def train():
             print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
             utils.adjust_learning_rate(optimizer, lr)
 
-    torch.save(states, f'./resnet152_1D_states.pth')
+    torch.save(states, f'./save/resnet50_1D_states.pth')
 
 
 if __name__ == '__main__':
