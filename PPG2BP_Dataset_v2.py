@@ -50,9 +50,8 @@ class PPG2BPDataset(Dataset):
 
         ppg = self.ppg[index, :]
         bp = self.BP[index, :]
-
         ppg = ppg.unsqueeze(dim=0)
-        ppg = torch.transpose(ppg, 1, 0)
+        # ppg = torch.transpose(ppg, 1, 0)
 
         sbp = (bp[0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
         dbp = (bp[1] - self.DBP_min) / (self.DBP_max - self.DBP_min)

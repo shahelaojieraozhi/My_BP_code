@@ -20,8 +20,8 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
-# from resnet18_1D import resnet18_1d
-from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
+from resnet18_1D import resnet18_1d
+# from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset_v2 import PPG2BPDataset
 
 warnings.filterwarnings("ignore")
@@ -97,7 +97,7 @@ def train():
     opt = parser.parse_args()
 
     "model"
-    resnet_1d = resnet34()
+    resnet_1d = resnet18_1d()
     model = resnet_1d.to(device)
 
     model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
