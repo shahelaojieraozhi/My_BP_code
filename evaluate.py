@@ -85,7 +85,7 @@ def calculate_metrics(array1, array2):
 
 
 if __name__ == '__main__':
-    bp = pd.read_csv("predict_test/res_normal_18/predict_test_4.csv")
+    bp = pd.read_csv("predict_test/sigmoid_18_30_5.79/predict_test_5.csv")
 
     sbp_hat_arr = bp['sbp_hat_arr']
     dbp_hat_arr = bp['dbp_hat_arr']
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
 
     # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
-    plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
+    # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
 
     print("SBP Standard Deviation (SD):", sbp_sd)
     print("SBP Mean Absolute Error (MAE):", sbp_mae)

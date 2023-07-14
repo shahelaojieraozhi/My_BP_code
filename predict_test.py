@@ -48,7 +48,7 @@ def inv_normalize(sbp_arr, dbp_arr):
 def test():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-n", "--n_epochs", type=int, default=200, help="number of epochs of training")
+    parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
     parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='cnn', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
@@ -65,7 +65,7 @@ def test():
     model = resnet_1d.to(device)
     # model.load_state_dict(torch.load('save/cnn_202307111750/best_w.pth')['state_dict'])     # 18
     # model.load_state_dict(torch.load('save/cnn_202307120933/best_w.pth')['state_dict'])     # 34
-    model.load_state_dict(torch.load('save/add_normal_res_18/best_w.pth')['state_dict'])  # 50
+    model.load_state_dict(torch.load('save/resnet18_202307141251/best_w.pth')['state_dict'])  # 50
 
     model.eval()
     loss_meter, it_count = 0, 0
@@ -87,7 +87,7 @@ def test():
             sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
 
             table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr,  sbp_arr, dbp_arr)).T
-            pd.DataFrame(table_arr).to_csv("./predict_test/res_normal_18/predict_test_{}.csv".format(test_batch_idx),
+            pd.DataFrame(table_arr).to_csv("./predict_test/sigmoid_18_30_5.79/predict_test_{}.csv".format(test_batch_idx),
                                            header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
 
             loss_sbp = F.mse_loss(sbp_hat, sbp)

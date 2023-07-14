@@ -115,7 +115,7 @@ def train():
     lr = 1e-3
     start_epoch = 1
     stage = 1
-    step = [200, 150]
+    step = [15, 25]
 
     states = []
 

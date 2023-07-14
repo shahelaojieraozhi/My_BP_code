@@ -114,6 +114,10 @@ def resnet18_1d(num_classes=2):
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
 
 
+def resnet34_1d(num_classes=2):
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes)
+
+
 if __name__ == '__main__':
     # Create an instance of the ResNet18 model
     model = resnet18_1d()
