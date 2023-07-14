@@ -95,7 +95,7 @@ if __name__ == '__main__':
     sbp_sd, sbp_mae, sbp_rmse, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
     dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
 
-    plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
+    # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
     plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
 
     print("SBP Standard Deviation (SD):", sbp_sd)

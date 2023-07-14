@@ -58,9 +58,9 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
 
         it_count += 1
         if it_count != 0 and it_count % show_interval == 0:
-            print("%d, loss: %.3e" % (it_count, loss.item()))
+            print("%d, loss: %.3e" % (it_count, loss_meter))    # show the sum loss of every show_interval
 
-    return loss_meter / it_count
+    return loss_meter
 
 
 def val_epoch(model, optimizer, val_dataloader):
@@ -79,7 +79,7 @@ def val_epoch(model, optimizer, val_dataloader):
             loss_meter += loss.item()
             it_count += 1
 
-    return loss_meter / it_count
+    return loss_meter
 
 
 def train():
@@ -89,7 +89,7 @@ def train():
 
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
     parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
-    parser.add_argument("-t", "--type", type=str, default='cnn', help="model type")
+    parser.add_argument("-t", "--type", type=str, default='resnet50', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     opt = parser.parse_args()
 
