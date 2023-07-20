@@ -65,7 +65,7 @@ def test():
     model = resnet_1d.to(device)
     # model.load_state_dict(torch.load('save/cnn_202307111750/best_w.pth')['state_dict'])     # 18
     # model.load_state_dict(torch.load('save/cnn_202307120933/best_w.pth')['state_dict'])     # 34
-    model.load_state_dict(torch.load('save/resnet18_202307141251/best_w.pth')['state_dict'])  # 50
+    model.load_state_dict(torch.load('save/resnet18_202307141720/best_w.pth')['state_dict'])  # 50
 
     model.eval()
     loss_meter, it_count = 0, 0
@@ -87,7 +87,7 @@ def test():
             sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
 
             table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr,  sbp_arr, dbp_arr)).T
-            pd.DataFrame(table_arr).to_csv("./predict_test/sigmoid_18_30_5.79/predict_test_{}.csv".format(test_batch_idx),
+            pd.DataFrame(table_arr).to_csv("./predict_test/18_60_10e4/predict_test_{}.csv".format(test_batch_idx),
                                            header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
 
             loss_sbp = F.mse_loss(sbp_hat, sbp)

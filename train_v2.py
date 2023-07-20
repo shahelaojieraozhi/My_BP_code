@@ -20,7 +20,7 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
-from resnet18_1D import resnet18_1d
+from resnet18_1D import resnet18_1d, resnet34_1d
 from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset_v2 import PPG2BPDataset
 
@@ -94,7 +94,7 @@ def train():
     opt = parser.parse_args()
 
     "model"
-    resnet_1d = resnet18_1d()
+    resnet_1d = resnet34_1d()
     # resnet_1d = resnet50()
     model = resnet_1d.to(device)
 

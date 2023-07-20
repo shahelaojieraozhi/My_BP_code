@@ -85,25 +85,31 @@ def calculate_metrics(array1, array2):
 
 
 if __name__ == '__main__':
-    bp = pd.read_csv("predict_test/sigmoid_18_30_5.79/predict_test_5.csv")
 
-    sbp_hat_arr = bp['sbp_hat_arr']
-    dbp_hat_arr = bp['dbp_hat_arr']
-    sbp_arr = bp['sbp_arr']
-    dbp_arr = bp['dbp_arr']
+    for i in range(10):
 
-    sbp_sd, sbp_mae, sbp_rmse, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
-    dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
+        bp = pd.read_csv("predict_test/18_60_10e4/predict_test_{}.csv".format(i))
 
-    # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
-    # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
+        sbp_hat_arr = bp['sbp_hat_arr']
+        dbp_hat_arr = bp['dbp_hat_arr']
+        sbp_arr = bp['sbp_arr']
+        dbp_arr = bp['dbp_arr']
 
-    print("SBP Standard Deviation (SD):", sbp_sd)
-    print("SBP Mean Absolute Error (MAE):", sbp_mae)
-    print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
-    print("SBP Correlation Coefficient (r-value):", sbp_r_value)
+        sbp_sd, sbp_mae, sbp_rmse, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
+        dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
 
-    print("DBP Standard Deviation (SD):", dbp_sd)
-    print("DBP Mean Absolute Error (MAE):", dbp_mae)
-    print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
-    print("DBP Correlation Coefficient (r-value):", dbp_r_value)
+        plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
+        # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
+
+        print()
+        print("SBP Standard Deviation (SD):", sbp_sd)
+        print("SBP Mean Absolute Error (MAE):", sbp_mae)
+        print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
+        print("SBP Correlation Coefficient (r-value):", sbp_r_value)
+
+        print("DBP Standard Deviation (SD):", dbp_sd)
+        print("DBP Mean Absolute Error (MAE):", dbp_mae)
+        print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
+        print("DBP Correlation Coefficient (r-value):", dbp_r_value)
+        print()
+
