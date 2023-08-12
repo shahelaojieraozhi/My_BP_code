@@ -37,7 +37,6 @@ def calculate_metrics(array1, array2):
 
 
 def plot_coordinates(gt_bp, pre_bp):
-
     # 创建一个新的图形
     plt.figure(figsize=(12, 8))
     ax = plt.gca()
@@ -57,6 +56,7 @@ def plot_coordinates(gt_bp, pre_bp):
 if __name__ == '__main__':
     bp = pd.read_csv("predict_test/18_60_10e4/predict_test_1.csv")
     sbp_section_list = [x for x in range(60, 200, 20)]
+
     for threshold in sbp_section_list:
         sbp_split = bp[(threshold < bp['sbp_arr']) & (bp['sbp_arr'] < int(threshold) + 10)]
         sbp_hat_arr = sbp_split['sbp_hat_arr']
@@ -71,20 +71,19 @@ if __name__ == '__main__':
         print()
         plot_coordinates(sbp_arr, sbp_hat_arr)
 
-    # dbp_section_list = [x for x in range(40, 120, 20)]
-    #
-    # for threshold in dbp_section_list:
-    #     dbp_split = bp[(threshold < bp['dbp_arr']) & (bp['dbp_arr'] < int(threshold) + 10)]
-    #     dbp_hat_arr = dbp_split['dbp_hat_arr']
-    #     dbp_arr = dbp_split['dbp_arr']
-    #
-    #     dbp_sd, dbp_mae, _, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
-    #
-    #     print()
-    #     print("DBP section is {} ~ {}".format(threshold, threshold + 10))
-    #     print("DBP section number is {}".format(len(dbp_arr)))
-    #     print("DBP Standard Deviation (SD):", dbp_sd)
-    #     print("DBP Mean Absolute Error (MAE):", dbp_mae)
-    #     print()
-    #     plot_coordinates(dbp_arr, dbp_hat_arr)
+    dbp_section_list = [x for x in range(40, 120, 20)]
 
+    for threshold in dbp_section_list:
+        dbp_split = bp[(threshold < bp['dbp_arr']) & (bp['dbp_arr'] < int(threshold) + 10)]
+        dbp_hat_arr = dbp_split['dbp_hat_arr']
+        dbp_arr = dbp_split['dbp_arr']
+
+        dbp_sd, dbp_mae, _, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
+
+        print()
+        print("DBP section is {} ~ {}".format(threshold, threshold + 10))
+        print("DBP section number is {}".format(len(dbp_arr)))
+        print("DBP Standard Deviation (SD):", dbp_sd)
+        print("DBP Mean Absolute Error (MAE):", dbp_mae)
+        print()
+        plot_coordinates(dbp_arr, dbp_hat_arr)

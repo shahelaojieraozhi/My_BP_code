@@ -23,6 +23,8 @@ import utils
 from resnet18_1D import resnet18_1d, resnet34_1d
 from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset_v2 import PPG2BPDataset
+# from Transformer_reg import TF
+from Transformer_reg_v2 import RegressionTransformer
 
 warnings.filterwarnings("ignore")
 
@@ -43,8 +45,13 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
     loss_meter, it_count = 0, 0
 
     for (ppg, sbp, dbp) in train_dataloader:
+        # tf
+        ppg = ppg.squeeze(1)
+
+        # other
         ppg = ppg.to(device)
         bp_hat = model(ppg).cpu()
+
         sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
         optimizer.zero_grad()
 
@@ -58,7 +65,7 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
 
         it_count += 1
         if it_count != 0 and it_count % show_interval == 0:
-            print("%d, loss: %.3e" % (it_count, loss_meter))    # show the sum loss of every show_interval
+            print("%d, loss: %.3e" % (it_count, loss_meter))  # show the sum loss of every show_interval
 
     return loss_meter
 
@@ -68,6 +75,9 @@ def val_epoch(model, optimizer, val_dataloader):
     loss_meter, it_count = 0, 0
     with torch.no_grad():
         for (ppg, sbp, dbp) in val_dataloader:
+            # transformer
+            ppg = ppg.squeeze(1)
+            # other
             ppg = ppg.to(device)
             bp_hat = model(ppg).cpu()
             sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
@@ -88,15 +98,17 @@ def train():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
+    parser.add_argument("-b", "--batch", type=int, default=128, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='resnet18', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     opt = parser.parse_args()
 
     "model"
-    resnet_1d = resnet34_1d()
+    # model = TF(in_features=875, drop=0.).to(device)
+    model = RegressionTransformer(input_dim=875, output_dim=2)
+    # model = resnet34_1d().to(device)
     # resnet_1d = resnet50()
-    model = resnet_1d.to(device)
+    # model = resnet_1d.to(device)
 
     model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     os.makedirs(model_save_dir, exist_ok=True)
@@ -109,13 +121,14 @@ def train():
     train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=1)
     val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=1)
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
     best_lost = 1e3
-    lr = 1e-3
+    lr = 1e-4
     start_epoch = 1
     stage = 1
     step = [15, 25]
+    weight_decay = 2
+
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     states = []
 
