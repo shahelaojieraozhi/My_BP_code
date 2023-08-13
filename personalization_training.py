@@ -95,13 +95,25 @@ def val_epoch(model, optimizer, val_dataloader):
     return loss_meter
 
 
+def inv_normalize(sbp_arr, dbp_arr):
+    sbp_min = 40
+    sbp_max = 200
+    dbp_min = 40
+    dbp_max = 120
+
+    sbp_arr = sbp_arr * (sbp_max - sbp_min) + sbp_min
+    dbp_arr = dbp_arr * (dbp_max - dbp_min) + dbp_min
+
+    return sbp_arr, dbp_arr
+
+
 def train():
     print('loading data...')
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
-    parser.add_argument("-b", "--batch_size", type=int, default=128, help="batch size of training")
+    parser.add_argument("-b", "--batch_size", type=int, default=2048, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='resnet18', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     parser.add_argument('--N_trials', type=int, default=20,
@@ -112,13 +124,30 @@ def train():
     # model = TF(in_features=875, drop=0.).to(device)
     # model = RegressionTransformer(input_dim=875, output_dim=2)
     # model = resnet34_1d().to(device)
-    resnet_1d = resnet50()
+    # resnet_1d = resnet50()
     # model = resnet_1d.to(device)
 
-    model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
-    os.makedirs(model_save_dir, exist_ok=True)
+    resnet_1d = resnet18_1d()
+    # resnet_1d = resnet50()
+    model = resnet_1d.to(device)
 
-    test_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test"
+    model.load_state_dict(torch.load('save/resnet18_202307141720/best_w.pth')['state_dict'])  # 50
+
+    # for name, param in model.named_parameters():
+    #     # print(name)
+    #     # print(param)
+    #     print(name, "   ", param.shape)
+    #
+    # a1 = list(model.parameters())
+    # a = list(model.parameters())[:-8]
+
+    for param in list(model.parameters())[:-8]:
+        param.requires_grad = False
+
+    # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
+    # os.makedirs(model_save_dir, exist_ok=True)
+
+    # test_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test"
     # test_data = PPG2bpDataset(test_data_path)
     # test_loader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
 
@@ -150,68 +179,101 @@ def train():
         n_train = int(np.round(0.2 * n_same_subject_idx))
         # get 20% data of a subject(subject_idx == subject) as train data
 
-        idx_test = np.arange(n_train + 1, n_same_subject_idx, 2)    # why?
-        ppg_test = ppg_trial[idx_test, :]
-        bp_test = bp_trial[idx_test, :]
+        idx_test = np.arange(n_train + 1, n_same_subject_idx, 2)  # why?
+        ppg_test = ppg_trial[idx_test, :]  # (87, 875)
+        bp_test = bp_trial[idx_test, :]  # (87, 2)
 
         ppg_trial = np.delete(ppg_trial, idx_test, axis=0)
         bp_trial = np.delete(bp_trial, idx_test, axis=0)
 
-        random_pick = False
+        random_pick = True
 
         # draw training data from the test subject's data
         if random_pick:
             idx_train, idx_val = train_test_split(range(ppg_trial.shape[0]), test_size=int(n_train), shuffle=True)
-            ppg_train = ppg_trial[idx_train, :]
-            bp_train = bp_trial[idx_train, :]
-            ppg_val = ppg_trial[idx_val, :]
-            bp_val = bp_trial[idx_val, :]
+            ppg_train = ppg_trial[idx_train, :]  # ndarray (87, 875)
+            bp_train = bp_trial[idx_train, :]  # ndarray (87, 2)
+            ppg_val = ppg_trial[idx_val, :]  # ndarray (43, 875)
+            bp_val = bp_trial[idx_val, :]  # ndarray (43, 2)
         else:
             ppg_train = ppg_trial[:n_train, :]
             bp_train = bp_trial[:n_train, :]
             ppg_val = ppg_trial[:n_train, :]
             bp_val = bp_trial[:n_train, :]
 
-    # best_lost = 1e3
-    # lr = 1e-4
-    # start_epoch = 1
-    # stage = 1
-    # step = [15, 25]
-    # weight_decay = 2
-    #
-    # optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    #
-    # states = []
-    #
-    # for epoch in range(start_epoch, opt.n_epochs):
-    #     since = time.time()
-    #     train_loss = train_epoch(model, optimizer, train_loader, 50)
-    #     val_loss = val_epoch(model, optimizer, val_loader)
-    #
-    #     print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s\n'
-    #           % (epoch, stage, train_loss, val_loss, utils.print_time_cost(since)))
-    #
-    #     writer = SummaryWriter(model_save_dir)
-    #     writer.add_scalar('train_loss', train_loss, epoch)  # add_scalar 添加标量
-    #     writer.add_scalar('val_loss', val_loss, epoch)  # add_scalar 添加标量
-    #     writer.close()
-    #
-    #     state = {"state_dict": model.state_dict(), "epoch": epoch,
-    #              "loss": val_loss, 'lr': lr, 'stage': stage}
-    #
-    #     states.append(state)
-    #
-    #     save_ckpt(state, best_lost > val_loss, model_save_dir)
-    #     best_lost = min(best_lost, val_loss)
-    #
-    #     if epoch in step:
-    #         stage += 1
-    #         lr /= 10
-    #
-    #         print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
-    #         utils.adjust_learning_rate(optimizer, lr)
-    #
-    # torch.save(states, f'./save/resnet50_1D_states.pth')
+        # to tensor
+
+        def ndarray2tensor(x):
+            return torch.from_numpy(x.astype(np.float32))
+
+        ppg_test_tensor = ndarray2tensor(ppg_test).unsqueeze(dim=0)  # (87, 875)
+        # bp_test_tensor = ndarray2tensor(bp_test)  # (87, 2)
+        ppg_train_tensor = ndarray2tensor(ppg_train).unsqueeze(dim=0)  # (87, 875)
+        # bp_train_tensor = ndarray2tensor(bp_train)  # (87, 2)
+        ppg_val_tensor = ndarray2tensor(ppg_val).unsqueeze(dim=0)  # (87, 875)
+        # bp_val_tensor = ndarray2tensor(bp_val)  # (87, 2)
+
+        ppg_test_tensor = torch.transpose(ppg_test_tensor, 1, 0)
+        ppg_train_tensor = torch.transpose(ppg_train_tensor, 1, 0)
+        ppg_val_tensor = torch.transpose(ppg_val_tensor, 1, 0)
+
+        torch_container = torch.empty([2048, 1, 875])
+        torch_container[:len(ppg_test_tensor), :, :] = ppg_test_tensor
+        torch_container = torch_container.to(device)
+        bp_val_pre_pers_hat = model(torch_container).cpu()
+
+        bp_val_pre_pers_hat_arr = bp_val_pre_pers_hat.numpy()
+
+        # sbp_val_pre_pers, dbp_val_pre_pers
+
+        sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
+        sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
+
+        # SBP_train = BP_train[:, 0]
+        # DBP_train = BP_train[:, 1]
+        # SBP_val = BP_val[:, 0]
+        # DBP_val = BP_val[:, 1]
+
+        # best_lost = 1e3
+        # lr = 1e-4
+        # start_epoch = 1
+        # stage = 1
+        # step = [15, 25]
+        # weight_decay = 2
+        #
+        # optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+        #
+        # states = []
+        #
+        # for epoch in range(start_epoch, opt.n_epochs):
+        #     since = time.time()
+        #     train_loss = train_epoch(model, optimizer, train_loader, 50)
+        #     val_loss = val_epoch(model, optimizer, val_loader)
+        #
+        #     print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s\n'
+        #           % (epoch, stage, train_loss, val_loss, utils.print_time_cost(since)))
+        #
+        #     writer = SummaryWriter(model_save_dir)
+        #     writer.add_scalar('train_loss', train_loss, epoch)  # add_scalar 添加标量
+        #     writer.add_scalar('val_loss', val_loss, epoch)  # add_scalar 添加标量
+        #     writer.close()
+        #
+        #     state = {"state_dict": model.state_dict(), "epoch": epoch,
+        #              "loss": val_loss, 'lr': lr, 'stage': stage}
+        #
+        #     states.append(state)
+        #
+        #     save_ckpt(state, best_lost > val_loss, model_save_dir)
+        #     best_lost = min(best_lost, val_loss)
+        #
+        #     if epoch in step:
+        #         stage += 1
+        #         lr /= 10
+        #
+        #         print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
+        #         utils.adjust_learning_rate(optimizer, lr)
+        #
+        # torch.save(states, f'./save/resnet18_1D_states.pth')
 
 
 if __name__ == '__main__':
