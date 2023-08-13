@@ -43,54 +43,46 @@ def save_ckpt(state, is_best, model_save_dir):
     if is_best: shutil.copyfile(current_w, best_w)
 
 
-def train_epoch(model, optimizer, train_dataloader, show_interval=10):
+def train_epoch(model, optimizer, train_ppg, train_bp):
     model.train()
-    loss_meter, it_count = 0, 0
 
-    for (ppg, sbp, dbp) in train_dataloader:
-        # tf
-        ppg = ppg.squeeze(1)
+    loss_meter = 0
+    ppg = train_ppg.squeeze(1)
 
-        # other
-        ppg = ppg.to(device)
-        bp_hat = model(ppg).cpu()
+    ppg = ppg.to(device)
+    bp_hat = model(ppg).cpu()
 
-        sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
-        optimizer.zero_grad()
+    sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+    optimizer.zero_grad()
 
-        loss_sbp = F.mse_loss(sbp_hat, sbp)
-        loss_dbp = F.mse_loss(dbp_hat, dbp)
-        loss = loss_dbp + loss_sbp
+    loss_sbp = F.mse_loss(sbp_hat, train_bp[:0])
+    loss_dbp = F.mse_loss(dbp_hat, train_bp[:1])
+    loss = loss_dbp + loss_sbp
 
-        loss.backward()
-        optimizer.step()
-        loss_meter += loss.item()
+    loss.backward()
+    optimizer.step()
+    loss_meter += loss.item()
 
-        it_count += 1
-        if it_count != 0 and it_count % show_interval == 0:
-            print("%d, loss: %.3e" % (it_count, loss_meter))  # show the sum loss of every show_interval
+    print("loss: %.3e" % loss_meter)  # show the sum loss of every show_interval
 
     return loss_meter
 
 
-def val_epoch(model, optimizer, val_dataloader):
+def val_epoch(model, optimizer, val_ppg, val_bp):
     model.eval()
-    loss_meter, it_count = 0, 0
+    loss_meter = 0
     with torch.no_grad():
-        for (ppg, sbp, dbp) in val_dataloader:
-            # transformer
-            ppg = ppg.squeeze(1)
+            ppg = val_ppg.squeeze(1)
             # other
             ppg = ppg.to(device)
             bp_hat = model(ppg).cpu()
             sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
             optimizer.zero_grad()
 
-            loss_sbp = F.mse_loss(sbp_hat, sbp)
-            loss_dbp = F.mse_loss(dbp_hat, dbp)
+            loss_sbp = F.mse_loss(sbp_hat, val_bp[:0])
+            loss_dbp = F.mse_loss(dbp_hat, val_bp[:1])
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
-            it_count += 1
 
     return loss_meter
 
@@ -209,9 +201,9 @@ def train():
         ppg_test_tensor = ndarray2tensor(ppg_test).unsqueeze(dim=0)  # (87, 875)
         # bp_test_tensor = ndarray2tensor(bp_test)  # (87, 2)
         ppg_train_tensor = ndarray2tensor(ppg_train).unsqueeze(dim=0)  # (87, 875)
-        # bp_train_tensor = ndarray2tensor(bp_train)  # (87, 2)
+        bp_train_tensor = ndarray2tensor(bp_train)  # (87, 2)
         ppg_val_tensor = ndarray2tensor(ppg_val).unsqueeze(dim=0)  # (87, 875)
-        # bp_val_tensor = ndarray2tensor(bp_val)  # (87, 2)
+        bp_val_tensor = ndarray2tensor(bp_val)  # (87, 2)
 
         ppg_test_tensor = torch.transpose(ppg_test_tensor, 1, 0)
         ppg_train_tensor = torch.transpose(ppg_train_tensor, 1, 0)
@@ -222,58 +214,54 @@ def train():
         torch_container = torch_container.to(device)
         bp_val_pre_pers_hat = model(torch_container).cpu()
 
-        bp_val_pre_pers_hat_arr = bp_val_pre_pers_hat.numpy()
+        bp_val_pre_pers_hat_arr = bp_val_pre_pers_hat.detach().numpy()
 
         # sbp_val_pre_pers, dbp_val_pre_pers
 
-        sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
-        sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
+        sbp_arr, dbp_arr = inv_normalize(bp_test[:, 0], bp_test[:, 1])
+        sbp_hat_arr, dbp_hat_arr = inv_normalize(bp_val_pre_pers_hat_arr[:, 0], bp_val_pre_pers_hat_arr[:, 1])
 
-        # SBP_train = BP_train[:, 0]
-        # DBP_train = BP_train[:, 1]
-        # SBP_val = BP_val[:, 0]
-        # DBP_val = BP_val[:, 1]
+        best_lost = 1e3
+        lr = 1e-4
+        start_epoch = 1
+        stage = 1
+        step = [15, 25]
+        weight_decay = 2
 
-        # best_lost = 1e3
-        # lr = 1e-4
-        # start_epoch = 1
-        # stage = 1
-        # step = [15, 25]
-        # weight_decay = 2
-        #
-        # optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-        #
-        # states = []
-        #
-        # for epoch in range(start_epoch, opt.n_epochs):
-        #     since = time.time()
-        #     train_loss = train_epoch(model, optimizer, train_loader, 50)
-        #     val_loss = val_epoch(model, optimizer, val_loader)
-        #
-        #     print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s\n'
-        #           % (epoch, stage, train_loss, val_loss, utils.print_time_cost(since)))
-        #
-        #     writer = SummaryWriter(model_save_dir)
-        #     writer.add_scalar('train_loss', train_loss, epoch)  # add_scalar 添加标量
-        #     writer.add_scalar('val_loss', val_loss, epoch)  # add_scalar 添加标量
-        #     writer.close()
-        #
-        #     state = {"state_dict": model.state_dict(), "epoch": epoch,
-        #              "loss": val_loss, 'lr': lr, 'stage': stage}
-        #
-        #     states.append(state)
-        #
-        #     save_ckpt(state, best_lost > val_loss, model_save_dir)
-        #     best_lost = min(best_lost, val_loss)
-        #
-        #     if epoch in step:
-        #         stage += 1
-        #         lr /= 10
-        #
-        #         print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
-        #         utils.adjust_learning_rate(optimizer, lr)
-        #
-        # torch.save(states, f'./save/resnet18_1D_states.pth')
+        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+        states = []
+
+        for epoch in range(start_epoch, opt.n_epochs):
+            since = time.time()
+
+            train_loss = train_epoch(model, optimizer, ppg_train_tensor, bp_train_tensor)
+            val_loss = val_epoch(model, optimizer, ppg_val_tensor, bp_val_tensor)
+
+            print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s\n'
+                  % (epoch, stage, train_loss, val_loss, utils.print_time_cost(since)))
+
+            writer = SummaryWriter(model_save_dir)
+            writer.add_scalar('train_loss', train_loss, epoch)  # add_scalar 添加标量
+            writer.add_scalar('val_loss', val_loss, epoch)  # add_scalar 添加标量
+            writer.close()
+
+            state = {"state_dict": model.state_dict(), "epoch": epoch,
+                     "loss": val_loss, 'lr': lr, 'stage': stage}
+
+            states.append(state)
+
+            save_ckpt(state, best_lost > val_loss, model_save_dir)
+            best_lost = min(best_lost, val_loss)
+
+            if epoch in step:
+                stage += 1
+                lr /= 10
+
+                print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
+                utils.adjust_learning_rate(optimizer, lr)
+
+        torch.save(states, f'./save/resnet18_1D_states.pth')
 
 
 if __name__ == '__main__':
