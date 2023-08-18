@@ -18,6 +18,7 @@ import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 import torch
+from torch.utils.data import Dataset
 from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -43,46 +44,54 @@ def save_ckpt(state, is_best, model_save_dir):
     if is_best: shutil.copyfile(current_w, best_w)
 
 
-def train_epoch(model, optimizer, train_ppg, train_bp):
+def train_epoch(model, optimizer, train_dataloader, show_interval=10):
     model.train()
+    loss_meter, it_count = 0, 0
 
-    loss_meter = 0
-    ppg = train_ppg.squeeze(1)
+    for (ppg, sbp, dbp) in train_dataloader:
+        # tf
+        # ppg = ppg.squeeze(1)
 
-    ppg = ppg.to(device)
-    bp_hat = model(ppg).cpu()
+        # other
+        ppg = ppg.to(device)
+        bp_hat = model(ppg).cpu()
 
-    sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
-    optimizer.zero_grad()
+        sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+        optimizer.zero_grad()
 
-    loss_sbp = F.mse_loss(sbp_hat, train_bp[:0])
-    loss_dbp = F.mse_loss(dbp_hat, train_bp[:1])
-    loss = loss_dbp + loss_sbp
+        loss_sbp = F.mse_loss(sbp_hat, sbp)
+        loss_dbp = F.mse_loss(dbp_hat, dbp)
+        loss = loss_dbp + loss_sbp
 
-    loss.backward()
-    optimizer.step()
-    loss_meter += loss.item()
+        loss.backward()
+        optimizer.step()
+        loss_meter += loss.item()
 
-    print("loss: %.3e" % loss_meter)  # show the sum loss of every show_interval
+        it_count += 1
+        if it_count != 0 and it_count % show_interval == 0:
+            print("%d, loss: %.3e" % (it_count, loss_meter))  # show the sum loss of every show_interval
 
     return loss_meter
 
 
-def val_epoch(model, optimizer, val_ppg, val_bp):
+def val_epoch(model, optimizer, val_dataloader):
     model.eval()
-    loss_meter = 0
+    loss_meter, it_count = 0, 0
     with torch.no_grad():
-            ppg = val_ppg.squeeze(1)
+        for (ppg, sbp, dbp) in val_dataloader:
+            # transformer
+            # ppg = ppg.squeeze(1)
             # other
             ppg = ppg.to(device)
             bp_hat = model(ppg).cpu()
             sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
             optimizer.zero_grad()
 
-            loss_sbp = F.mse_loss(sbp_hat, val_bp[:0])
-            loss_dbp = F.mse_loss(dbp_hat, val_bp[:1])
+            loss_sbp = F.mse_loss(sbp_hat, sbp)
+            loss_dbp = F.mse_loss(dbp_hat, dbp)
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
+            it_count += 1
 
     return loss_meter
 
@@ -105,7 +114,7 @@ def train():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
-    parser.add_argument("-b", "--batch_size", type=int, default=2048, help="batch size of training")
+    parser.add_argument("-b", "--batch_size", type=int, default=32, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='resnet18', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     parser.add_argument('--N_trials', type=int, default=20,
@@ -139,24 +148,22 @@ def train():
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     # os.makedirs(model_save_dir, exist_ok=True)
 
-    # test_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test"
-    # test_data = PPG2bpDataset(test_data_path)
-    # test_loader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
-
     pd_col_names = ['subject', 'Sbp_true', 'Dbp_true', 'Sbp_est_prepers', 'Dbp_est_prepers', 'Sbp_est_postpers',
                     'Dbp_est_postpers']
     results = pd.DataFrame([], columns=pd_col_names)
 
     # load the test dataset of MIMIC-iii (here, it is regarded as the train dataset)
-    data = np.load('08-11-2023_pers_dataset.npz')
+    data = np.load(r'G:\Blood_Pressure_dataset\cvprw\08-11-2023_pers_dataset.npz')
+    # data = np.load('reshaped_test_dataset.npz')
 
     ppg = data['arr_0']  # shape = (250000, 875)
-    bp = data['arr_1']  # shape = (250000, 875)
-    subject_idx = data['arr_2']  # shape = (250000, 875)
+    bp = data['arr_1']  # shape = (250000, 2)
+    subject_idx = data['arr_2']  # shape = (250000)  # shape = (250000)
     subjects = np.unique(subject_idx)
 
     trial_subjects = np.random.choice(subjects, size=opt.N_trials, replace=False)
     # N_trials  :  Number subjects used for personalization (default :20)
+
     with open('ppg_personalization_subject_list.txt', 'w') as f:
         for item in trial_subjects:
             f.write(("%s\n" % item))
@@ -195,31 +202,59 @@ def train():
 
         # to tensor
 
-        def ndarray2tensor(x):
-            return torch.from_numpy(x.astype(np.float32))
+        class TDataset(Dataset):
+            """
+            A generic data loader where the samples are arranged in this way:
+            dd = {'train': train, 'val': val, "idx2name": idx2name, 'file2idx': file2idx}
+            """
 
-        ppg_test_tensor = ndarray2tensor(ppg_test).unsqueeze(dim=0)  # (87, 875)
-        # bp_test_tensor = ndarray2tensor(bp_test)  # (87, 2)
-        ppg_train_tensor = ndarray2tensor(ppg_train).unsqueeze(dim=0)  # (87, 875)
-        bp_train_tensor = ndarray2tensor(bp_train)  # (87, 2)
-        ppg_val_tensor = ndarray2tensor(ppg_val).unsqueeze(dim=0)  # (87, 875)
-        bp_val_tensor = ndarray2tensor(bp_val)  # (87, 2)
+            def __init__(self, x, y):
+                super(TDataset, self).__init__()
+                self.x = torch.from_numpy(x.astype(np.float32)).unsqueeze(dim=0)
+                self.y = torch.from_numpy(y.astype(np.float32))
+                self.ppg = torch.transpose(self.x, 1, 0)
+                self.sbp = self.y[:, 0]
+                self.dbp = self.y[:, 1]
 
-        ppg_test_tensor = torch.transpose(ppg_test_tensor, 1, 0)
-        ppg_train_tensor = torch.transpose(ppg_train_tensor, 1, 0)
-        ppg_val_tensor = torch.transpose(ppg_val_tensor, 1, 0)
+            def __getitem__(self, index):
+                return self.ppg[index], self.sbp[index], self.dbp[index]
 
-        torch_container = torch.empty([2048, 1, 875])
-        torch_container[:len(ppg_test_tensor), :, :] = ppg_test_tensor
-        torch_container = torch_container.to(device)
-        bp_val_pre_pers_hat = model(torch_container).cpu()
+            def __len__(self):
+                return len(self.ppg)
 
-        bp_val_pre_pers_hat_arr = bp_val_pre_pers_hat.detach().numpy()
+        train_data = TDataset(ppg_train, bp_train)
+        val_data = TDataset(ppg_val, bp_val)
+        test_data = TDataset(ppg_test, bp_test)
+
+        train_loader = DataLoader(train_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
+        test_loader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
+        val_loader = DataLoader(val_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
+
+        test_batch_idx = 0
+        with torch.no_grad():
+            for (ppg, sbp, dbp) in test_loader:
+                ppg = ppg.to(device)
+                bp_hat = model(ppg).cpu()
+                sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+
+                dbp_hat_arr = dbp_hat.numpy()
+                sbp_hat_arr = sbp_hat.numpy()
+
+                sbp_arr = sbp.numpy()
+                dbp_arr = dbp.numpy()
+
+                # sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
+                sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
+
+                table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr, sbp_arr, dbp_arr)).T
+                pd.DataFrame(table_arr).to_csv("finetune_result/predict_test_{}.csv".format(test_batch_idx),
+                                               header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
+                test_batch_idx += 1
+
+        # bp_val_pre_pers_hat = model(test_loader).cpu()
+        # bp_val_pre_pers_hat_arr = bp_val_pre_pers_hat.detach().numpy()
 
         # sbp_val_pre_pers, dbp_val_pre_pers
-
-        sbp_arr, dbp_arr = inv_normalize(bp_test[:, 0], bp_test[:, 1])
-        sbp_hat_arr, dbp_hat_arr = inv_normalize(bp_val_pre_pers_hat_arr[:, 0], bp_val_pre_pers_hat_arr[:, 1])
 
         best_lost = 1e3
         lr = 1e-4
@@ -232,11 +267,12 @@ def train():
 
         states = []
 
+        model_save_dir = 'save/fine-tune/' + str(subject) + '/'
         for epoch in range(start_epoch, opt.n_epochs):
             since = time.time()
 
-            train_loss = train_epoch(model, optimizer, ppg_train_tensor, bp_train_tensor)
-            val_loss = val_epoch(model, optimizer, ppg_val_tensor, bp_val_tensor)
+            train_loss = train_epoch(model, optimizer, train_loader)
+            val_loss = val_epoch(model, optimizer, val_loader)
 
             print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s\n'
                   % (epoch, stage, train_loss, val_loss, utils.print_time_cost(since)))
@@ -261,7 +297,7 @@ def train():
                 print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
                 utils.adjust_learning_rate(optimizer, lr)
 
-        torch.save(states, f'./save/resnet18_1D_states.pth')
+        torch.save(states, f'./save/' + str(subject) + '/' + 'resnet18_1D_states.pth')
 
 
 if __name__ == '__main__':

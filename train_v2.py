@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
 from resnet18_1D import resnet18_1d, resnet34_1d
-from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
+# from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset_v2 import PPG2BPDataset
 # from Transformer_reg import TF
 from Transformer_reg_v2 import RegressionTransformer
@@ -46,7 +46,7 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
 
     for (ppg, sbp, dbp) in train_dataloader:
         # tf
-        ppg = ppg.squeeze(1)
+        # ppg = ppg.squeeze(1)
 
         # other
         ppg = ppg.to(device)
@@ -76,7 +76,7 @@ def val_epoch(model, optimizer, val_dataloader):
     with torch.no_grad():
         for (ppg, sbp, dbp) in val_dataloader:
             # transformer
-            ppg = ppg.squeeze(1)
+            # ppg = ppg.squeeze(1)
             # other
             ppg = ppg.to(device)
             bp_hat = model(ppg).cpu()
@@ -98,17 +98,19 @@ def train():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=128, help="batch size of training")
+    parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='resnet18', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     opt = parser.parse_args()
 
     "model"
     # model = TF(in_features=875, drop=0.).to(device)
-    model = RegressionTransformer(input_dim=875, output_dim=2)
+    # model = RegressionTransformer(input_dim=875, output_dim=2)
     # model = resnet34_1d().to(device)
     # resnet_1d = resnet50()
     # model = resnet_1d.to(device)
+    resnet_1d = resnet18_1d()
+    model = resnet_1d.to(device)
 
     model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     os.makedirs(model_save_dir, exist_ok=True)
@@ -118,8 +120,8 @@ def train():
     train_data = PPG2BPDataset(train_data_path)
     val_data = PPG2BPDataset(val_data_path)
 
-    train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=1)
-    val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=1)
+    train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=0)
 
     best_lost = 1e3
     lr = 1e-4
@@ -134,7 +136,7 @@ def train():
 
     for epoch in range(start_epoch, opt.n_epochs):
         since = time.time()
-        train_loss = train_epoch(model, optimizer, train_loader, 50)
+        train_loss = train_epoch(model, optimizer, train_loader, 1000)
         val_loss = val_epoch(model, optimizer, val_loader)
 
         print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s\n'
@@ -160,7 +162,7 @@ def train():
             print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
             utils.adjust_learning_rate(optimizer, lr)
 
-    torch.save(states, f'./save/resnet50_1D_states.pth')
+    torch.save(states, f'./save/resnet18_1D_states.pth')
 
 
 if __name__ == '__main__':
