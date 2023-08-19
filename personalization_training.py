@@ -119,37 +119,19 @@ def bp_predict(model, test_loader):
             dbp_arr = dbp.numpy()
 
             sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
-
             bp_arr = np.vstack((sbp_hat_arr, dbp_hat_arr, sbp_arr, dbp_arr)).T
-            # pd.DataFrame(table_arr).to_csv("finetune_result/predict_test_{}.csv".format(test_batch_idx),
-            #                                header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
-
             bp_list.append(bp_arr)
             test_batch_idx += 1
-    return pd.DataFrame(np.concatenate(bp_list, axis=0))
+    return np.concatenate(bp_list, axis=0)
 
 
-def main():
-    print('loading data...')
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--n_epochs", type=int, default=50, help="number of epochs of training")
-    parser.add_argument("-b", "--batch_size", type=int, default=32, help="batch size of training")
-    parser.add_argument("-t", "--type", type=str, default='resnet18', help="model type")
-    parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
-    parser.add_argument('--N_trials', type=int, default=20, help="Number subjects used for personalization")
-    opt = parser.parse_args()
-
+def personalize_train(opt):
     # model
     resnet_1d = resnet18_1d()
     model = resnet_1d.to(device)
-    model.load_state_dict(torch.load('save/resnet18_202307141720/best_w.pth')['state_dict'])  # 50
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     # os.makedirs(model_save_dir, exist_ok=True)
-
-    pd_col_names = ['subject', 'Sbp_true', 'Dbp_true', 'Sbp_est_prepers', 'Dbp_est_prepers', 'Sbp_est_postpers',
-                    'Dbp_est_postpers']
-    results = pd.DataFrame([], columns=pd_col_names)
 
     # load the test dataset of MIMIC-iii (here, it is regarded as the train dataset)
     # data = np.load(r'G:\Blood_Pressure_dataset\cvprw\08-11-2023_pers_dataset.npz')
@@ -209,6 +191,7 @@ def main():
         val_loader = DataLoader(val_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
 
         # predict test samples' bp of MIMIC_III_ppg_test before fine-tune
+        model.load_state_dict(torch.load('save/resnet18_202307141720/best_w.pth')['state_dict'])  # 50
         pre_result = bp_predict(model, test_loader)
 
         # for name, param in model.named_parameters():
@@ -219,17 +202,16 @@ def main():
         # a1 = list(model.parameters())
         # a = list(model.parameters())[:-8]
 
-        for param in list(model.parameters())[:-8]:
+        for param in list(model.parameters())[:-opt.freeze_layers]:
             param.requires_grad = False
 
         best_loss = 1e-3
-        lr = 1e-4
         start_epoch = 1
         stage = 1
-        step = [15, 35]
+        step = [int(opt.n_epochs * 0.3), int(opt.n_epochs * 0.6), int(opt.n_epochs * 0.9)]
         weight_decay = 2
 
-        optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+        optimizer = optim.Adam(model.parameters(), lr=opt.lr, weight_decay=weight_decay)
         states = []
 
         model_save_dir = 'save/fine-tune/' + str(subject) + '/'
@@ -248,30 +230,44 @@ def main():
             writer.close()
 
             state = {"state_dict": model.state_dict(), "epoch": epoch,
-                     "loss": val_loss, 'lr': lr, 'stage': stage}
+                     "loss": val_loss, 'lr': opt.lr, 'stage': stage}
 
             states.append(state)
             # min(states["loss"])
             save_ckpt(state, best_loss > val_loss, model_save_dir)
-            best_lost = min(best_loss, val_loss)
+            # best_lost = min(best_loss, val_loss)
 
             if epoch in step:
                 stage += 1
-                lr /= 10
+                opt.lr /= 10
 
-                print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
-                utils.adjust_learning_rate(optimizer, lr)
+                print("*" * 10, "step into stage%02d lr %.3ef" % (stage, opt.lr))
+                utils.adjust_learning_rate(optimizer, opt.lr)
 
         poster_result = bp_predict(model, test_loader)
-
-        pd_col_names = ['SBP_true', 'DBP_true', 'SBP_hat_pre', 'DBP_hat_pre', 'SBP_hat_post', 'DBP_hat_post']
-        pd.concat([pre_result, poster_result[:, :2]], axis=1).to_csv("finetune_result/bp_table.csv",
-                                                                     header=pd_col_names,
-                                                                     index=False)
+        pd_col_names = ['SBP_hat_pre', 'DBP_hat_pre', 'SBP_true', 'DBP_true', 'SBP_hat_post', 'DBP_hat_post']
+        pd.concat([pd.DataFrame(pre_result), pd.DataFrame(poster_result[:, :-2])], axis=1).to_csv(
+            "finetune_result/bp_table_{}.csv".format(str(subject)),
+            header=pd_col_names,
+            index=False)
 
         # checkpoints_path = f"./save/fine-tune/" + str(subject)
         # os.makedirs(checkpoints_path, exist_ok=True)
         # torch.save(states, checkpoints_path + '/' + 'checkpoints.pth')
+
+
+def main():
+    print('loading data...')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
+    parser.add_argument("-b", "--batch_size", type=int, default=32, help="batch size of training")
+    parser.add_argument("-r", "--lr", type=int, default=1e-4, help="batch size of training")
+    parser.add_argument("-t", "--type", type=str, default='resnet18', help="model type")
+    parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
+    parser.add_argument('--N_trials', type=int, default=20, help="Number subjects used for personalization")
+    parser.add_argument('--freeze_layers', type=int, default=8, help="number of layers was frozen")
+    opt = parser.parse_args()
+    personalize_train(opt)
 
 
 if __name__ == '__main__':
