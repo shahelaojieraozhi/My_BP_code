@@ -12,23 +12,18 @@ import os
 import shutil
 import time
 import argparse
-
 import numpy as np
 import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 import torch
-from torch.utils.data import Dataset
 from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 import utils
-from resnet18_1D import resnet18_1d, resnet34_1d
-from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
-# from PPG2BP_Dataset_v2 import PPG2BPDataset
-# from Transformer_reg import TF
-from Transformer_reg_v2 import RegressionTransformer
+from resnet18_1D import resnet18_1d
+from PPG2BP_Dataset_finetune import TDataset
 
 warnings.filterwarnings("ignore")
 
@@ -108,42 +103,46 @@ def inv_normalize(sbp_arr, dbp_arr):
     return sbp_arr, dbp_arr
 
 
-def train():
+def bp_predict(model, test_loader):
+    test_batch_idx = 0
+    bp_list = []
+    with torch.no_grad():
+        for (ppg, sbp, dbp) in test_loader:
+            ppg = ppg.to(device)
+            bp_hat = model(ppg).cpu()
+            sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+
+            dbp_hat_arr = dbp_hat.numpy()
+            sbp_hat_arr = sbp_hat.numpy()
+
+            sbp_arr = sbp.numpy()
+            dbp_arr = dbp.numpy()
+
+            sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
+
+            bp_arr = np.vstack((sbp_hat_arr, dbp_hat_arr, sbp_arr, dbp_arr)).T
+            # pd.DataFrame(table_arr).to_csv("finetune_result/predict_test_{}.csv".format(test_batch_idx),
+            #                                header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
+
+            bp_list.append(bp_arr)
+            test_batch_idx += 1
+    return pd.DataFrame(np.concatenate(bp_list, axis=0))
+
+
+def main():
     print('loading data...')
-
     parser = argparse.ArgumentParser()
-
-    parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
+    parser.add_argument("-n", "--n_epochs", type=int, default=50, help="number of epochs of training")
     parser.add_argument("-b", "--batch_size", type=int, default=32, help="batch size of training")
     parser.add_argument("-t", "--type", type=str, default='resnet18', help="model type")
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
-    parser.add_argument('--N_trials', type=int, default=20,
-                        help="Number subjects used for personalization (default :20)")
+    parser.add_argument('--N_trials', type=int, default=20, help="Number subjects used for personalization")
     opt = parser.parse_args()
 
-    "model"
-    # model = TF(in_features=875, drop=0.).to(device)
-    # model = RegressionTransformer(input_dim=875, output_dim=2)
-    # model = resnet34_1d().to(device)
-    # resnet_1d = resnet50()
-    # model = resnet_1d.to(device)
-
+    # model
     resnet_1d = resnet18_1d()
-    # resnet_1d = resnet50()
     model = resnet_1d.to(device)
-
     model.load_state_dict(torch.load('save/resnet18_202307141720/best_w.pth')['state_dict'])  # 50
-
-    # for name, param in model.named_parameters():
-    #     # print(name)
-    #     # print(param)
-    #     print(name, "   ", param.shape)
-    #
-    # a1 = list(model.parameters())
-    # a = list(model.parameters())[:-8]
-
-    for param in list(model.parameters())[:-8]:
-        param.requires_grad = False
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     # os.makedirs(model_save_dir, exist_ok=True)
@@ -153,8 +152,8 @@ def train():
     results = pd.DataFrame([], columns=pd_col_names)
 
     # load the test dataset of MIMIC-iii (here, it is regarded as the train dataset)
-    data = np.load(r'G:\Blood_Pressure_dataset\cvprw\08-11-2023_pers_dataset.npz')
-    # data = np.load('reshaped_test_dataset.npz')
+    # data = np.load(r'G:\Blood_Pressure_dataset\cvprw\08-11-2023_pers_dataset.npz')
+    data = np.load('reshaped_test_dataset.npz')
 
     ppg = data['arr_0']  # shape = (250000, 875)
     bp = data['arr_1']  # shape = (250000, 2)
@@ -201,27 +200,6 @@ def train():
             bp_val = bp_trial[:n_train, :]
 
         # to tensor
-
-        class TDataset(Dataset):
-            """
-            A generic data loader where the samples are arranged in this way:
-            dd = {'train': train, 'val': val, "idx2name": idx2name, 'file2idx': file2idx}
-            """
-
-            def __init__(self, x, y):
-                super(TDataset, self).__init__()
-                self.x = torch.from_numpy(x.astype(np.float32)).unsqueeze(dim=0)
-                self.y = torch.from_numpy(y.astype(np.float32))
-                self.ppg = torch.transpose(self.x, 1, 0)
-                self.sbp = self.y[:, 0]
-                self.dbp = self.y[:, 1]
-
-            def __getitem__(self, index):
-                return self.ppg[index], self.sbp[index], self.dbp[index]
-
-            def __len__(self):
-                return len(self.ppg)
-
         train_data = TDataset(ppg_train, bp_train)
         val_data = TDataset(ppg_val, bp_val)
         test_data = TDataset(ppg_test, bp_test)
@@ -230,41 +208,28 @@ def train():
         test_loader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
         val_loader = DataLoader(val_data, batch_size=opt.batch_size, shuffle=True, num_workers=0)
 
-        test_batch_idx = 0
-        with torch.no_grad():
-            for (ppg, sbp, dbp) in test_loader:
-                ppg = ppg.to(device)
-                bp_hat = model(ppg).cpu()
-                sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+        # predict test samples' bp of MIMIC_III_ppg_test before fine-tune
+        pre_result = bp_predict(model, test_loader)
 
-                dbp_hat_arr = dbp_hat.numpy()
-                sbp_hat_arr = sbp_hat.numpy()
+        # for name, param in model.named_parameters():
+        #     # print(name)
+        #     # print(param)
+        #     print(name, "   ", param.shape)
 
-                sbp_arr = sbp.numpy()
-                dbp_arr = dbp.numpy()
+        # a1 = list(model.parameters())
+        # a = list(model.parameters())[:-8]
 
-                # sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
-                sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
+        for param in list(model.parameters())[:-8]:
+            param.requires_grad = False
 
-                table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr, sbp_arr, dbp_arr)).T
-                pd.DataFrame(table_arr).to_csv("finetune_result/predict_test_{}.csv".format(test_batch_idx),
-                                               header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
-                test_batch_idx += 1
-
-        # bp_val_pre_pers_hat = model(test_loader).cpu()
-        # bp_val_pre_pers_hat_arr = bp_val_pre_pers_hat.detach().numpy()
-
-        # sbp_val_pre_pers, dbp_val_pre_pers
-
-        best_lost = 1e3
+        best_loss = 1e-3
         lr = 1e-4
         start_epoch = 1
         stage = 1
-        step = [15, 25]
+        step = [15, 35]
         weight_decay = 2
 
         optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-
         states = []
 
         model_save_dir = 'save/fine-tune/' + str(subject) + '/'
@@ -286,9 +251,9 @@ def train():
                      "loss": val_loss, 'lr': lr, 'stage': stage}
 
             states.append(state)
-
-            save_ckpt(state, best_lost > val_loss, model_save_dir)
-            best_lost = min(best_lost, val_loss)
+            # min(states["loss"])
+            save_ckpt(state, best_loss > val_loss, model_save_dir)
+            best_lost = min(best_loss, val_loss)
 
             if epoch in step:
                 stage += 1
@@ -297,10 +262,19 @@ def train():
                 print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
                 utils.adjust_learning_rate(optimizer, lr)
 
-        torch.save(states, f'./save/' + str(subject) + '/' + 'resnet18_1D_states.pth')
+        poster_result = bp_predict(model, test_loader)
+
+        pd_col_names = ['SBP_true', 'DBP_true', 'SBP_hat_pre', 'DBP_hat_pre', 'SBP_hat_post', 'DBP_hat_post']
+        pd.concat([pre_result, poster_result[:, :2]], axis=1).to_csv("finetune_result/bp_table.csv",
+                                                                     header=pd_col_names,
+                                                                     index=False)
+
+        # checkpoints_path = f"./save/fine-tune/" + str(subject)
+        # os.makedirs(checkpoints_path, exist_ok=True)
+        # torch.save(states, checkpoints_path + '/' + 'checkpoints.pth')
 
 
 if __name__ == '__main__':
-    train()
+    main()
 
 # tensorboard --logdir=cnn_202305061217 --port=6007
