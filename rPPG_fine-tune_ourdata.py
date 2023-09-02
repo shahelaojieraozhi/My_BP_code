@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-@Project ：My_BP_code 
+@Project ：My_BP_code
 @Time    : 2023/8/20 9:47
 @Author  : Rao Zhi
 @File    : rPPG_fine-tune.py
 @email   : raozhi@mails.cust.edu.cn
-@IDE     ：PyCharm 
+@IDE     ：PyCharm
 
 """
 
@@ -31,10 +31,6 @@ from PPG2BP_Dataset_finetune import TDataset
 warnings.filterwarnings("ignore")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(seed=42)
-
-data_file = "rPPG_data/rPPG-BP-UKL_rppg_7s.h5"
-PerformPersonalization = False
-RandomPick = False
 
 
 def save_ckpt(state, is_best, model_save_dir):
@@ -141,18 +137,14 @@ def fine_tuning(opt):
     resnet_1d = resnet18_1d()
     model = resnet_1d.to(device)
 
-    # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
-    # os.makedirs(model_save_dir, exist_ok=True)
-
     # load rPPG data from the provided hdf5 files
-    with h5py.File(data_file, 'r') as f:
-        rppg = f.get('rppg')
+    with h5py.File(opt.data_file, 'r') as f:
+        rppg = f.get('rPPG')
         BP = f.get('label')
         subjects = f.get('subject_idx')
 
-        rppg = np.transpose(np.array(rppg), axes=(1, 0))
-        # rppg = np.expand_dims(rppg, axis=2)  # (7851, 875, 1)
-        BP = np.transpose(np.array(BP), axes=(1, 0))  # (7851, 2)
+        rppg = np.transpose(np.array(rppg))
+        BP = np.transpose(np.array(BP))  # (7851, 2)
         subjects = np.array(subjects)  # (1, 7851)
 
     subjects_list = np.unique(subjects)
@@ -168,7 +160,7 @@ def fine_tuning(opt):
         mask = np.isin(subjects_iter, subject)
 
         # determine index of the test subject and delete it from the subjects list
-        idx_test = np.where(mask.reshape(-1))    # subjects_iter is 2 dim, transfer to 1 dim
+        idx_test = np.where(mask.reshape(-1))  # subjects_iter is 2 dim, transfer to 1 dim
 
         # subjects_iter = np.delete(subjects_iter, np.where(idx_test))
         # subjects_list_iter = np.delete(subjects_list_iter, np.where(mask))
@@ -181,9 +173,9 @@ def fine_tuning(opt):
         idx_val = np.where(np.isin(subjects_iter, subjects_val))[-1]
 
         # if personalization is enabled: assign some data from the test subjects to the training set
-        if PerformPersonalization:
+        if opt.PerformPersonalization:
             # choose data randomly or use first 20 % of the test subject's data
-            if RandomPick:
+            if opt.RandomPick:
                 idx_test, idx_add_train = train_test_split(idx_test, test_size=0.2)
                 idx_train = np.concatenate((idx_train, idx_add_train), axis=0)
             else:
@@ -285,6 +277,13 @@ def main():
     parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
     parser.add_argument('--N_trials', type=int, default=20, help="Number subjects used for personalization")
     parser.add_argument('--freeze_layers', type=int, default=2, help="number of layers was frozen")
+
+    parser.add_argument('--data_file', type=str, default="rPPG_data/rPPG_bp_subject.h5", help="path of rPPG data")
+    parser.add_argument('--PerformPersonalization', default=False,
+                        help="if assign some data from the test subjects to the training set")
+    parser.add_argument('--RandomPick', default=False,
+                        help="If choose data randomly or use first 20 % of the test subject's data")
+
     opt = parser.parse_args()
 
     del_file("finetune_result")
