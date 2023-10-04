@@ -91,21 +91,21 @@ class ResNet(nn.Module):
             layers.append(block(self.in_channels, out_channels))
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-        x = self.conv1(x)
+    def forward(self, x):       # (2048, 1, 875)
+        x = self.conv1(x)       # (2048, 64, 438)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
+        x = self.maxpool(x)     # (2048, 64, 219)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+        x = self.layer1(x)      # (2048, 64, 219)
+        x = self.layer2(x)      # (2048, 128, 110)
+        x = self.layer3(x)      # (2048, 256, 55)
+        x = self.layer4(x)      # (2048, 512, 28)
 
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-        x = self.sigmoid(x)
+        x = self.avgpool(x)     # (2048, 512, 1)
+        x = torch.flatten(x, 1)   # (2048, 512)
+        x = self.fc(x)            # (2048, 2)
+        x = self.sigmoid(x)       # (2048, 2)
 
         return x
 

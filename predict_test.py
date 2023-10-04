@@ -22,9 +22,9 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
-from resnet18_1D import resnet18_1d
+from model.resnet18_1D import resnet18_1d
 from PPG2BP_Dataset_v2 import PPG2BPDataset
-from Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
+from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
 
 warnings.filterwarnings("ignore")
 
@@ -57,7 +57,7 @@ def test():
     print('loading data...')
     test_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test"
     test_data = PPG2BPDataset(test_data_path)
-    test_loader = DataLoader(test_data, batch_size=opt.batch, shuffle=True, num_workers=1)
+    test_loader = DataLoader(test_data, batch_size=opt.batch, shuffle=True, num_workers=0)
 
     "model"
     resnet_1d = resnet18_1d()
@@ -65,7 +65,7 @@ def test():
     model = resnet_1d.to(device)
     # model.load_state_dict(torch.load('save/cnn_202307111750/best_w.pth')['state_dict'])     # 18
     # model.load_state_dict(torch.load('save/cnn_202307120933/best_w.pth')['state_dict'])     # 34
-    model.load_state_dict(torch.load('save/resnet18_202307141720/best_w.pth')['state_dict'])  # 50
+    model.load_state_dict(torch.load('save/resnet18_val_loss_2.807/best_w.pth')['state_dict'])  # 50
 
     model.eval()
     loss_meter, it_count = 0, 0
@@ -86,9 +86,10 @@ def test():
             sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
             sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
 
-            table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr,  sbp_arr, dbp_arr)).T
-            pd.DataFrame(table_arr).to_csv("./predict_test/18_60_10e4/predict_test_{}.csv".format(test_batch_idx),
-                                           header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
+            table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr, sbp_arr, dbp_arr)).T
+            pd.DataFrame(table_arr).to_csv(
+                "./predict_test/resnet18_val_loss_2.807/predict_test_{}.csv".format(test_batch_idx),
+                header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
 
             loss_sbp = F.mse_loss(sbp_hat, sbp)
             loss_dbp = F.mse_loss(dbp_hat, dbp)
@@ -105,4 +106,5 @@ if __name__ == '__main__':
     test_loss = test()
     print(test_loss)
 
-# tensorboard --logdir=cnn_202305061217 --port=6007
+# tensorboard --logdir=resnet18_202307141720 --port=6007
+# tensorboard --logdir=add_normal_res_18 --port=6007

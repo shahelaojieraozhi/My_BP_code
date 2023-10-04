@@ -61,9 +61,9 @@ def plot_coordinates(gt_bp, pre_bp, sd, mae, sbp=True):
         ax.text(20, 115, 'mae: ' + str(int(mae)), fontsize=12, fontweight='bold', color='red', ha='center',
                 va='center')
 
-    ax.set_title('Right ascension declination map')
-    ax.set_xlabel('Right Ascension')
-    ax.set_ylabel('Declination')
+    ax.set_title('Blood Pressure Evaluation')
+    ax.set_xlabel('subject index')
+    ax.set_ylabel('bp value')
     ax.legend()
     plt.show()
 
@@ -85,31 +85,55 @@ def calculate_metrics(array1, array2):
 
 
 if __name__ == '__main__':
+    # for i in range(20):
+    #
+    #     # bp = pd.read_csv("predict_test/18_60_10e4/predict_test_{}.csv".format(i))
+    #     bp = pd.read_csv("../predict_test/resnet18_val_loss_2.807/predict_test_{}.csv".format(i))
+    #
+    #     sbp_hat_arr = bp['sbp_hat_arr']
+    #     dbp_hat_arr = bp['dbp_hat_arr']
+    #     sbp_arr = bp['sbp_arr']
+    #     dbp_arr = bp['dbp_arr']
+    #
+    #     sbp_sd, sbp_mae, sbp_rmse, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
+    #     dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
+    #
+    #     # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
+    #     # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
+    #
+    #     print()
+    #     print("SBP Standard Deviation (SD):", sbp_sd)
+    #     print("SBP Mean Absolute Error (MAE):", sbp_mae)
+    #     print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
+    #     print("SBP Correlation Coefficient (r-value):", sbp_r_value)
+    #
+    #     print("DBP Standard Deviation (SD):", dbp_sd)
+    #     print("DBP Mean Absolute Error (MAE):", dbp_mae)
+    #     print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
+    #     print("DBP Correlation Coefficient (r-value):", dbp_r_value)
+    #     print()
 
-    for i in range(10):
+    bp = pd.read_csv('./resnet_ppg_nonmixed_test_results.csv')
 
-        bp = pd.read_csv("predict_test/18_60_10e4/predict_test_{}.csv".format(i))
+    sbp_hat_arr = bp['SBP_est']
+    dbp_hat_arr = bp['DBP_est']
+    sbp_arr = bp['SBP_true']
+    dbp_arr = bp['DBP_true']
 
-        sbp_hat_arr = bp['sbp_hat_arr']
-        dbp_hat_arr = bp['dbp_hat_arr']
-        sbp_arr = bp['sbp_arr']
-        dbp_arr = bp['dbp_arr']
+    sbp_sd, sbp_mae, sbp_rmse, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
+    dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
 
-        sbp_sd, sbp_mae, sbp_rmse, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
-        dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
+    # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
+    # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
 
-        plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
-        # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
+    print()
+    print("SBP Standard Deviation (SD):", sbp_sd)
+    print("SBP Mean Absolute Error (MAE):", sbp_mae)
+    print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
+    print("SBP Correlation Coefficient (r-value):", sbp_r_value)
 
-        print()
-        print("SBP Standard Deviation (SD):", sbp_sd)
-        print("SBP Mean Absolute Error (MAE):", sbp_mae)
-        print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
-        print("SBP Correlation Coefficient (r-value):", sbp_r_value)
-
-        print("DBP Standard Deviation (SD):", dbp_sd)
-        print("DBP Mean Absolute Error (MAE):", dbp_mae)
-        print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
-        print("DBP Correlation Coefficient (r-value):", dbp_r_value)
-        print()
-
+    print("DBP Standard Deviation (SD):", dbp_sd)
+    print("DBP Mean Absolute Error (MAE):", dbp_mae)
+    print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
+    print("DBP Correlation Coefficient (r-value):", dbp_r_value)
+    print()

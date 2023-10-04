@@ -54,7 +54,8 @@ def plot_coordinates(gt_bp, pre_bp):
 
 
 if __name__ == '__main__':
-    bp = pd.read_csv("predict_test/18_60_10e4/predict_test_1.csv")
+    # bp = pd.read_csv("../predict_test/resnet18_val_loss_2.807/predict_test_0.csv")
+    bp = pd.read_csv("./resnet_ppg_nonmixed_test_results.csv")
     sbp_section_list = [x for x in range(60, 200, 20)]
 
     for threshold in sbp_section_list:

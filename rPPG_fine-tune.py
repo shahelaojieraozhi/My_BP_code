@@ -25,7 +25,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 import utils
-from resnet18_1D import resnet18_1d
+from model.resnet18_1D import resnet18_1d
 from PPG2BP_Dataset_finetune import TDataset
 
 warnings.filterwarnings("ignore")

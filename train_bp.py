@@ -3,7 +3,7 @@
 @Project ：My_BP_code 
 @Time    : 2023/7/12 9:00
 @Author  : Rao Zhi
-@File    : train.py
+@File    : train_bp.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 
@@ -21,8 +21,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
 # from resnet18_1D import resnet18_1d
-from Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
+from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset import PPG2BPDataset
+from model.bp_MSR_Net import MSResNet
 
 warnings.filterwarnings("ignore")
 
@@ -103,6 +104,9 @@ def train():
     resnet_1d = resnet34()
     model = resnet_1d.to(device)
 
+    # bp_msr_net = MSResNet(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
+    # model = bp_msr_net.to(device)
+
     model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     os.makedirs(model_save_dir, exist_ok=True)
 
@@ -111,8 +115,8 @@ def train():
     train_data = PPG2BPDataset(train_data_path)
     val_data = PPG2BPDataset(val_data_path)
 
-    train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=1)
-    val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=1)
+    train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=0)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
