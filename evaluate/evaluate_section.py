@@ -8,6 +8,7 @@
 @IDE     ：PyCharm 
 
 """
+import os
 import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr
@@ -54,12 +55,23 @@ def plot_coordinates(gt_bp, pre_bp):
 
 
 if __name__ == '__main__':
-    # bp = pd.read_csv("../predict_test/resnet18_val_loss_2.807/predict_test_0.csv")
-    bp = pd.read_csv("./resnet_ppg_nonmixed_test_results.csv")
-    sbp_section_list = [x for x in range(60, 200, 20)]
+    """ This is my train result """
+    # test_path = '../predict_test/resnet18_val_loss_2.807/'
+    # bps = []
+    # columns = ['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr']
+    # for sec in os.listdir(test_path):
+    #     single_sec = pd.read_csv(os.path.join(test_path, sec))
+    #     bps.append(single_sec)
+    #
+    # bps = pd.DataFrame(np.concatenate(bps), columns=columns)
 
-    for threshold in sbp_section_list:
-        sbp_split = bp[(threshold < bp['sbp_arr']) & (bp['sbp_arr'] < int(threshold) + 10)]
+    """ This is the paper result """
+    bps = pd.read_csv("./resnet_ppg_nonmixed_test_results.csv")
+
+    sbp_section = [x for x in range(60, 200, 10)]
+
+    for threshold in sbp_section:
+        sbp_split = bps[(threshold < bps['sbp_arr']) & (bps['sbp_arr'] < int(threshold) + 10)]
         sbp_hat_arr = sbp_split['sbp_hat_arr']
         sbp_arr = sbp_split['sbp_arr']
         sbp_sd, sbp_mae, _, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
@@ -70,12 +82,12 @@ if __name__ == '__main__':
         print("SBP Standard Deviation (SD):", sbp_sd)
         print("SBP Mean Absolute Error (MAE):", sbp_mae)
         print()
-        plot_coordinates(sbp_arr, sbp_hat_arr)
+        # plot_coordinates(sbp_arr, sbp_hat_arr)
 
-    dbp_section_list = [x for x in range(40, 120, 20)]
+    dbp_section = [x for x in range(40, 110, 10)]
 
-    for threshold in dbp_section_list:
-        dbp_split = bp[(threshold < bp['dbp_arr']) & (bp['dbp_arr'] < int(threshold) + 10)]
+    for threshold in dbp_section:
+        dbp_split = bps[(threshold < bps['dbp_arr']) & (bps['dbp_arr'] < int(threshold) + 10)]
         dbp_hat_arr = dbp_split['dbp_hat_arr']
         dbp_arr = dbp_split['dbp_arr']
 
@@ -86,5 +98,5 @@ if __name__ == '__main__':
         print("DBP section number is {}".format(len(dbp_arr)))
         print("DBP Standard Deviation (SD):", dbp_sd)
         print("DBP Mean Absolute Error (MAE):", dbp_mae)
-        print()
-        plot_coordinates(dbp_arr, dbp_hat_arr)
+        # print()
+        # plot_coordinates(dbp_arr, dbp_hat_arr)
