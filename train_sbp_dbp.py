@@ -1,9 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 @Project ：My_BP_code 
+@Time    : 2023/10/4 16:51
+@Author  : Rao Zhi
+@File    : train_sbp_dbp.py
+@email   : raozhi@mails.cust.edu.cn
+@IDE     ：PyCharm 
+
+"""
+# -*- coding: utf-8 -*-
+"""
+@Project ：My_BP_code 
 @Time    : 2023/7/12 9:00
 @Author  : Rao Zhi
-@File    : train_bp.py
+@File    : train_spb_dbp.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 
@@ -12,7 +22,6 @@ import os
 import shutil
 import time
 import argparse
-
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 import torch
@@ -20,9 +29,11 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
-# from resnet18_1D import resnet18_1d
+from model.resnet18_1D import resnet18_1d, resnet34_1d
 from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
-from PPG2BP_Dataset import PPG2BPDataset
+from PPG2BP_Dataset_v2 import PPG2BPDataset
+# from Transformer_reg import TF
+from Transformer_reg_v2 import RegressionTransformer
 from model.bp_MSR_Net import MSResNet
 
 warnings.filterwarnings("ignore")
@@ -43,17 +54,19 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
     model.train()
     loss_meter, it_count = 0, 0
 
-    for (ppg, bp) in train_dataloader:
+    for (ppg, sbp, dbp) in train_dataloader:
+        # tf
+        # ppg = ppg.squeeze(1)
+
+        # other
         ppg = ppg.to(device)
-        ppg = ppg.unsqueeze(dim=0)
-        ppg = torch.transpose(ppg, 1, 0)
         bp_hat = model(ppg).cpu()
-        dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+
+        sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
         optimizer.zero_grad()
 
-        loss_dbp = F.mse_loss(dbp_hat, bp[:, 0])
-        loss_sbp = F.mse_loss(sbp_hat, bp[:, 1])
-
+        loss_sbp = F.mse_loss(sbp_hat, sbp)
+        loss_dbp = F.mse_loss(dbp_hat, dbp)
         loss = loss_dbp + loss_sbp
 
         loss.backward()
@@ -62,54 +75,61 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
 
         it_count += 1
         if it_count != 0 and it_count % show_interval == 0:
-            print("%d, loss: %.3e" % (it_count, loss.item()))
+            print("%d, loss: %.3e" % (it_count, loss_meter))  # show the sum loss of every show_interval
 
-    return loss_meter / it_count
+    return loss_meter
 
 
 def val_epoch(model, optimizer, val_dataloader):
     model.eval()
     loss_meter, it_count = 0, 0
     with torch.no_grad():
-        for (ppg, bp) in val_dataloader:
+        for (ppg, sbp, dbp) in val_dataloader:
+            # transformer
+            # ppg = ppg.squeeze(1)
+            # other
             ppg = ppg.to(device)
-            ppg = ppg.unsqueeze(dim=0)
-            ppg = torch.transpose(ppg, 1, 0)
             bp_hat = model(ppg).cpu()
-            dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+            sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
             optimizer.zero_grad()
 
-            loss_dbp = F.mse_loss(dbp_hat, bp[:, 0])
-            loss_sbp = F.mse_loss(sbp_hat, bp[:, 1])
-
+            loss_sbp = F.mse_loss(sbp_hat, sbp)
+            loss_dbp = F.mse_loss(dbp_hat, dbp)
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
             it_count += 1
 
-    return loss_meter / it_count
+    return loss_meter
 
 
-def train():
-    print('loading data...')
+def train(opt):
+    # load param
+    best_lost = opt.best_lost
+    lr = opt.lr
+    start_epoch = opt.start_epoch
+    stage = opt.stage
+    step = opt.decay_step
+    weight_decay = opt.weight_decay
 
-    parser = argparse.ArgumentParser()
+    "load model"
+    # model = TF(in_features=875, drop=0.).to(device)
+    # model = RegressionTransformer(input_dim=875, output_dim=2)
+    # model = resnet34_1d().to(device)
 
-    parser.add_argument("-n", "--n_epochs", type=int, default=20, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=1024, help="batch size of training")
-    parser.add_argument("-t", "--type", type=str, default='cnn', help="model type")
-    parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
-    opt = parser.parse_args()
-
-    "model"
-    resnet_1d = resnet34()
-    model = resnet_1d.to(device)
+    model = resnet18_1d()
+    # model = resnet18()
+    # model = resnet50()
+    model = model.to(device)
 
     # bp_msr_net = MSResNet(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
     # model = bp_msr_net.to(device)
 
-    model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
+    # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
+    model_save_dir = f'save/{opt.model}_{opt.describe}_{time.strftime("%Y%m%d%H")}'
     os.makedirs(model_save_dir, exist_ok=True)
 
+    """load data"""
+    print('loading data...')
     train_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\train"
     val_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\val"
     train_data = PPG2BPDataset(train_data_path)
@@ -118,13 +138,7 @@ def train():
     train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=0)
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-    best_lost = 1e3
-    lr = 1e-3
-    start_epoch = 1
-    stage = 1
-    step = [10, 15]
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     states = []
 
@@ -156,10 +170,25 @@ def train():
             print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
             utils.adjust_learning_rate(optimizer, lr)
 
-    torch.save(states, f'./resnet152_1D_states.pth')
+    torch.save(states, f'./save/resnet18_1D_states.pth')
 
 
 if __name__ == '__main__':
-    train()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--model", type=str, default='resnet50', help="model type")
+    parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
+    parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
+    parser.add_argument("-d", "--describe", type=str, default='lr=1e-3', help="describe for this model")
+    parser.add_argument("-bl", "--best_lost", type=int, default=1e3, help="best_lost")
+    parser.add_argument("-lr", "--lr", type=int, default=1e-3, help="learning rate")
+    parser.add_argument("-se", "--start_epoch", type=int, default=1, help="start_epoch")
+    parser.add_argument("-st", "--stage", type=int, default=1, help="stage")
+    parser.add_argument("-ds", "--decay_step", type=list, default=[5, 15, 25], help="decay step list of learning rate")
+    parser.add_argument("-wd", "--weight_decay", type=int, default=2, help="weight_decay")
+    args = parser.parse_args()
+    print(f'args: {vars(args)}')
+    train(args)
 
 # tensorboard --logdir=cnn_202305061217 --port=6007
+# tensorboard --logdir=add_normal_res_18 --port=6007
+

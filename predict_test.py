@@ -23,7 +23,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
 from model.resnet18_1D import resnet18_1d
-from PPG2BP_Dataset_v2 import PPG2BPDataset
+from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
 from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
 
 warnings.filterwarnings("ignore")

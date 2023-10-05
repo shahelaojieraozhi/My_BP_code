@@ -269,7 +269,7 @@ class MSResNet(nn.Module):
         out = out.squeeze()  # (1024, 768)
         # out = self.drop(out)
         out = self.fc(out)  # (1024, 6)
-        out = self.sigmoid(out)  # (2048, 2)
+        # out = self.sigmoid(out)  # (2048, 2)
 
         return out
 

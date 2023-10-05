@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 @Project ：My_BP_code 
-@Time    : 2023/7/10 11:03
+@Time    : 2023/10/4 20:24
 @Author  : Rao Zhi
-@File    : 1D_resnet18.py
+@File    : ppg2bp_net.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 
@@ -68,7 +68,7 @@ class ResNet(nn.Module):
         self.in_channels = 64
 
         self.conv1 = nn.Conv1d(
-            1, 64, kernel_size=7, stride=2, padding=3, bias=False
+            1, 64, kernel_size=13, stride=2, padding=3, bias=False
         )
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -91,20 +91,20 @@ class ResNet(nn.Module):
             layers.append(block(self.in_channels, out_channels))
         return nn.Sequential(*layers)
 
-    def forward(self, x):       # (2048, 1, 875)
-        x = self.conv1(x)       # (2048, 64, 438)
+    def forward(self, x):  # (2048, 1, 875)
+        x = self.conv1(x)  # (2048, 64, 438)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)     # (2048, 64, 219)
+        x = self.maxpool(x)  # (2048, 64, 219)
 
-        x = self.layer1(x)      # (2048, 64, 219)
-        x = self.layer2(x)      # (2048, 128, 110)
-        x = self.layer3(x)      # (2048, 256, 55)
-        x = self.layer4(x)      # (2048, 512, 28)
+        x = self.layer1(x)  # (2048, 64, 219)
+        x = self.layer2(x)  # (2048, 128, 110)
+        x = self.layer3(x)  # (2048, 256, 55)
+        x = self.layer4(x)  # (2048, 512, 28)
 
-        x = self.avgpool(x)     # (2048, 512, 1)
-        x = torch.flatten(x, 1)   # (2048, 512)
-        x = self.fc(x)            # (2048, 2)
+        x = self.avgpool(x)  # (2048, 512, 1)
+        x = torch.flatten(x, 1)  # (2048, 512)
+        x = self.fc(x)  # (2048, 2)
         # x = self.sigmoid(x)       # (2048, 2)
 
         return x
@@ -120,7 +120,8 @@ def resnet34_1d(num_classes=2):
 
 if __name__ == '__main__':
     # Create an instance of the ResNet18 model
-    model = resnet18_1d()
+    # model = resnet18_1d()
+    model = resnet34_1d()
 
     # Generate a random input signal of length 875
     input_signal = torch.randn(100, 1, 875)

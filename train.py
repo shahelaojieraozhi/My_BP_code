@@ -3,7 +3,7 @@
 @Project ：My_BP_code 
 @Time    : 2023/7/12 9:00
 @Author  : Rao Zhi
-@File    : train_spb_dbp.py
+@File    : train.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 
@@ -19,12 +19,11 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
-from model.resnet18_1D import resnet18_1d, resnet34_1d
-from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
-from PPG2BP_Dataset_v2 import PPG2BPDataset
-# from Transformer_reg import TF
-from Transformer_reg_v2 import RegressionTransformer
+# from model.resnet18_1D import resnet18_1d
+# from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
+from PPG2BP_Dataset import PPG2BPDataset
 from model.bp_MSR_Net import MSResNet
+from model.ppg2bp_net import resnet18_1d
 
 warnings.filterwarnings("ignore")
 
@@ -44,19 +43,17 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
     model.train()
     loss_meter, it_count = 0, 0
 
-    for (ppg, sbp, dbp) in train_dataloader:
-        # tf
-        # ppg = ppg.squeeze(1)
-
-        # other
+    for (ppg, bp) in train_dataloader:
         ppg = ppg.to(device)
+        ppg = ppg.unsqueeze(dim=0)
+        ppg = torch.transpose(ppg, 1, 0)
         bp_hat = model(ppg).cpu()
-
-        sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+        dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
         optimizer.zero_grad()
 
-        loss_sbp = F.mse_loss(sbp_hat, sbp)
-        loss_dbp = F.mse_loss(dbp_hat, dbp)
+        loss_dbp = F.mse_loss(dbp_hat, bp[:, 0])
+        loss_sbp = F.mse_loss(sbp_hat, bp[:, 1])
+
         loss = loss_dbp + loss_sbp
 
         loss.backward()
@@ -65,31 +62,31 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
 
         it_count += 1
         if it_count != 0 and it_count % show_interval == 0:
-            print("%d, loss: %.3e" % (it_count, loss_meter))  # show the sum loss of every show_interval
+            print("%d, loss: %.3e" % (it_count, loss.item()))
 
-    return loss_meter
+    return loss_meter / it_count
 
 
 def val_epoch(model, optimizer, val_dataloader):
     model.eval()
     loss_meter, it_count = 0, 0
     with torch.no_grad():
-        for (ppg, sbp, dbp) in val_dataloader:
-            # transformer
-            # ppg = ppg.squeeze(1)
-            # other
+        for (ppg, bp) in val_dataloader:
             ppg = ppg.to(device)
+            ppg = ppg.unsqueeze(dim=0)
+            ppg = torch.transpose(ppg, 1, 0)
             bp_hat = model(ppg).cpu()
-            sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+            dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
             optimizer.zero_grad()
 
-            loss_sbp = F.mse_loss(sbp_hat, sbp)
-            loss_dbp = F.mse_loss(dbp_hat, dbp)
+            loss_dbp = F.mse_loss(dbp_hat, bp[:, 0])
+            loss_sbp = F.mse_loss(sbp_hat, bp[:, 1])
+
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
             it_count += 1
 
-    return loss_meter
+    return loss_meter / it_count
 
 
 def train(opt):
@@ -106,13 +103,12 @@ def train(opt):
     # model = RegressionTransformer(input_dim=875, output_dim=2)
     # model = resnet34_1d().to(device)
 
-    # resnet_1d = resnet18_1d()
-    # resnet_1d = resnet18()
-    resnet_1d = resnet50()
-    model = resnet_1d.to(device)
-
-    # bp_msr_net = MSResNet(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
-    # model = bp_msr_net.to(device)
+    # model = resnet18()
+    # model = resnet50()
+    model = resnet18_1d()
+    model = model.to(device)
+    # model = MSResNet(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
+    # model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     model_save_dir = f'save/{opt.model}_{opt.describe}_{time.strftime("%Y%m%d%H")}'
@@ -160,12 +156,12 @@ def train(opt):
             print("*" * 10, "step into stage%02d lr %.3ef" % (stage, lr))
             utils.adjust_learning_rate(optimizer, lr)
 
-    torch.save(states, f'./save/resnet18_1D_states.pth')
+    # torch.save(states, f'./save/resnet18_1D_states.pth')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--model", type=str, default='resnet50', help="model type")
+    parser.add_argument("-t", "--model", type=str, default='resnet18', help="model type")
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
     parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
     parser.add_argument("-d", "--describe", type=str, default='lr=1e-3', help="describe for this model")
@@ -173,11 +169,10 @@ if __name__ == '__main__':
     parser.add_argument("-lr", "--lr", type=int, default=1e-3, help="learning rate")
     parser.add_argument("-se", "--start_epoch", type=int, default=1, help="start_epoch")
     parser.add_argument("-st", "--stage", type=int, default=1, help="stage")
-    parser.add_argument("-ds", "--decay_step", type=list, default=[5, 15, 25], help="decay step list of learning rate")
+    parser.add_argument("-ds", "--decay_step", type=list, default=[50], help="decay step list of learning rate")
     parser.add_argument("-wd", "--weight_decay", type=int, default=2, help="weight_decay")
     args = parser.parse_args()
     print(f'args: {vars(args)}')
     train(args)
 
 # tensorboard --logdir=cnn_202305061217 --port=6007
-# tensorboard --logdir=add_normal_res_18 --port=6007
