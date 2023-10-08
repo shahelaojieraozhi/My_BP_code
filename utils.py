@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
-'''
-@time: 2019/9/12 15:16
-
-@ author: javis
-'''
+"""
+@Project ：My_BP_code
+@Time    : 2023/10/7 8:28
+@Author  : Rao Zhi
+@File    : random_seeds_set.py
+@email   : raozhi@mails.cust.edu.cn
+@IDE     ：PyCharm
+@ref: javis
+"""
+import random
 import torch
 import numpy as np
 import time, os
@@ -46,3 +51,20 @@ class WeightedMultilabel(nn.Module):
     def forward(self, outputs, targets):
         loss = self.cerition(outputs, targets)
         return (loss * self.weights).mean()
+
+
+def seed_torch(seed=1029):
+    """
+    参考:https://blog.csdn.net/john_bh/article/details/107731443
+    """
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)  # To disable hash randomization and make the experiment reproducible
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
+
+seed_torch()

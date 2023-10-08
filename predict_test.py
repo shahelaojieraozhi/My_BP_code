@@ -65,7 +65,8 @@ def test():
     model = resnet_1d.to(device)
     # model.load_state_dict(torch.load('save/cnn_202307111750/best_w.pth')['state_dict'])     # 18
     # model.load_state_dict(torch.load('save/cnn_202307120933/best_w.pth')['state_dict'])     # 34
-    model.load_state_dict(torch.load('save/resnet18_val_loss_2.807/best_w.pth')['state_dict'])  # 50
+    # model.load_state_dict(torch.load('save/resnet18_val_loss_2.807/best_w.pth')['state_dict'])  # 50
+    model.load_state_dict(torch.load('logs/res18_ks=7,val_oss=637.7/best_w.pth')['state_dict'])
 
     model.eval()
     loss_meter, it_count = 0, 0
@@ -84,11 +85,11 @@ def test():
             dbp_arr = dbp.numpy()
 
             sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
-            sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
+            # sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
 
             table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr, sbp_arr, dbp_arr)).T
             pd.DataFrame(table_arr).to_csv(
-                "./predict_test/resnet18_val_loss_2.807/predict_test_{}.csv".format(test_batch_idx),
+                "./predict_test/res18_ks=13,val_oss=637.7/predict_test_{}.csv".format(test_batch_idx),
                 header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
 
             loss_sbp = F.mse_loss(sbp_hat, sbp)

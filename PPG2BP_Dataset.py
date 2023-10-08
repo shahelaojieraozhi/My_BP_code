@@ -13,6 +13,13 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import h5py
+from sklearn.preprocessing import StandardScaler
+
+scaler = StandardScaler()
+
+
+def normalization(ori_data):
+    return scaler.fit_transform(ori_data)
 
 
 class PPG2BPDataset(Dataset):
@@ -24,11 +31,17 @@ class PPG2BPDataset(Dataset):
     def __init__(self, path):
         super(PPG2BPDataset, self).__init__()
 
+        self.SBP_min = 40
+        self.SBP_max = 200
+        self.DBP_min = 40
+        self.DBP_max = 120
+
         self.file_count = 0
         path = path
         self.h5_path_list = os.listdir(path)
         with h5py.File(os.path.join(path, self.h5_path_list[self.file_count]), 'r') as f:
             self.ppg = f.get('/ppg')[:].astype(np.float32)
+            self.ppg = normalization(self.ppg)
             self.BP = f.get('/label')[:].astype(np.float32)
             self.ppg = torch.from_numpy(self.ppg)
             self.BP = torch.from_numpy(self.BP)
@@ -42,10 +55,13 @@ class PPG2BPDataset(Dataset):
         self.file_count = index // 1000
         index = index - 1000 * self.file_count
 
-        pulse = self.ppg[index, :]
-        BP = self.BP[index, :]
+        ppg_pulse = self.ppg[index, :]
+        bp = self.BP[index, :]
 
-        return pulse, BP
+        sbp = (bp[0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
+        dbp = (bp[1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
+
+        return ppg_pulse, sbp, dbp
 
     def __len__(self):
         return len(self.h5_path_list) * 1000

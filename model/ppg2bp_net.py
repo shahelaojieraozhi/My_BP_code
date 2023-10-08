@@ -82,6 +82,7 @@ class ResNet(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         self.sigmoid = nn.Sigmoid()
+        self.dropout = nn.Dropout(0.2)
 
     def _make_layer(self, block, out_channels, blocks, stride=1):
         layers = []
@@ -104,6 +105,7 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)  # (2048, 512, 1)
         x = torch.flatten(x, 1)  # (2048, 512)
+        x = self.dropout(x)
         x = self.fc(x)  # (2048, 2)
         # x = self.sigmoid(x)       # (2048, 2)
 

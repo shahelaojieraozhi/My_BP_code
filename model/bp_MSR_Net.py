@@ -141,7 +141,7 @@ class MSResNet(nn.Module):
 
         super(MSResNet, self).__init__()
 
-        self.conv1 = nn.Conv1d(input_channel, 64, kernel_size=7, stride=2, padding=3,
+        self.conv1 = nn.Conv1d(input_channel, 64, kernel_size=13, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -168,6 +168,7 @@ class MSResNet(nn.Module):
         # self.maxpool7 = nn.AvgPool1d(kernel_size=6, stride=1, padding=0)
 
         # self.drop = nn.Dropout(p=0.2)
+        self.drop = nn.Dropout(0.2)
 
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         """
@@ -267,9 +268,9 @@ class MSResNet(nn.Module):
         out = torch.cat([x, y, z], dim=1)  # (1024, 768, 1)
 
         out = out.squeeze()  # (1024, 768)
-        # out = self.drop(out)
+        out = self.drop(out)
         out = self.fc(out)  # (1024, 6)
-        # out = self.sigmoid(out)  # (2048, 2)
+        out = self.sigmoid(out)  # (2048, 2)
 
         return out
 
