@@ -88,7 +88,7 @@ def calculate_metrics(array1, array2):
 if __name__ == '__main__':
 
     """ This is my train result """
-    test_path = '../predict_test/resnet18_val_loss_2.807/'
+    test_path = '../predict_test/res_18_normal_val_loss_0.05076/'
     bps = []
     columns = ['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr']
     for sec in os.listdir(test_path):

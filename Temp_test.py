@@ -32,4 +32,19 @@
 # print(torch.cuda.is_available())  # cuda是否可用
 # print(torch.version.cuda)  # cuda版本
 
+import torch
 
+inputs = torch.rand(1024, 874, 1)
+padded_x = torch.nn.functional.pad(inputs, (0, 0, 0, 2), value=0)
+
+# # 创建一个示例张量
+# x = torch.tensor([[1, 2], [3, 4]])
+#
+# # 使用 pad 函数添加填充
+# # 第一个参数是输入张量，第二个参数是填充的大小（一个元组，各个维度的填充数），第三个参数是填充的值
+# padded_x = torch.nn.functional.pad(x, (1, 2, 1, 2), value=0)
+# """
+# 填充的大小参数是一个元组，包含了四个值，分别表示左边、右边、上边和下边的填充大小。
+# 在示例中，(1, 2, 1, 2) 表示在左边添加 1 列，右边添加 2 列，上边添加 1 行，下边添加 2 行的填充。
+# """
+print(padded_x.shape)

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 @Project ：My_BP_code 
-@Time    : 2023/7/12 8:59
+@Time    : 2023/10/9 10:11
 @Author  : Rao Zhi
-@File    : Resnet.py
+@File    : bpnet_cvprw.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 
@@ -72,13 +72,15 @@ class ResNet(nn.Module):
         self.in_channels = 64
         self.conv1 = nn.Conv1d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm1d(64)
-        self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
+        self.maxpool = nn.MaxPool1d(kernel_size=3, stride=3, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], stride=1)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        # self.avgpool = nn.AdaptiveAvgPool1d(1)
+        self.avgpool = nn.AvgPool1d(2)
+        # self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = nn.Linear(18432, num_classes)
 
     def _make_layer(self, block, out_channels, blocks, stride=1):
         layers = []

@@ -58,7 +58,7 @@ class MultiHeadAttention(nn.Module):
         self.to_queries = nn.Linear(query_size, query_size, bias=bias)
         #  projecting key and value together and spliting them for computing efficiently
         self.to_keys_values = nn.Linear(key_value_size, 2 * query_size, bias=bias)
-        self.project = nn.Linear(query_size, query_size)
+        self.project = nn.Linear(query_size, 2)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, query: torch.Tensor, key_value: torch.Tensor = None, mask: torch.Tensor = None) -> torch.Tensor:
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     num_layers = 8
     num_heads = 8
     gpt_hidden_size = 768
-    continuous_prompt = torch.rand(80, 512)
+    continuous_prompt = torch.rand(2048, 512)
     mapping_network = MappingNetwork(clip_project_length, clip_hidden_size, continuous_length,
                                      gpt_hidden_size, num_layers, num_heads)
 

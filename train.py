@@ -27,6 +27,7 @@ import utils
 from PPG2BP_Dataset import PPG2BPDataset
 from model.bp_MSR_Net import MSResNet
 from model.ppg2bp_net import resnet18_1d
+from model.bpnet_cvprw import resnet50
 
 warnings.filterwarnings("ignore")
 
@@ -58,7 +59,7 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
     model.train()
     loss_meter, it_count = 0, 0
 
-    for (ppg, sbp, dbp) in train_dataloader:
+    for (ppg, bp) in train_dataloader:
         ppg = ppg.to(device)
         ppg = ppg.unsqueeze(dim=0)
         ppg = torch.transpose(ppg, 1, 0)
@@ -66,8 +67,8 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
         dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
         optimizer.zero_grad()
 
-        loss_dbp = F.mse_loss(dbp_hat, dbp)
-        loss_sbp = F.mse_loss(sbp_hat, sbp)
+        loss_sbp = F.mse_loss(sbp_hat, bp[:, 0])
+        loss_dbp = F.mse_loss(dbp_hat, bp[:, 1])
 
         loss = loss_dbp + loss_sbp
 
@@ -86,7 +87,7 @@ def val_epoch(model, optimizer, val_dataloader):
     model.eval()
     loss_meter, it_count = 0, 0
     with torch.no_grad():
-        for (ppg, sbp, dbp) in val_dataloader:
+        for (ppg, bp) in val_dataloader:
             ppg = ppg.to(device)
             ppg = ppg.unsqueeze(dim=0)
             ppg = torch.transpose(ppg, 1, 0)
@@ -94,8 +95,8 @@ def val_epoch(model, optimizer, val_dataloader):
             dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
             optimizer.zero_grad()
 
-            loss_dbp = F.mse_loss(dbp_hat, dbp)
-            loss_sbp = F.mse_loss(sbp_hat, sbp)
+            loss_sbp = F.mse_loss(sbp_hat, bp[:, 0])
+            loss_dbp = F.mse_loss(dbp_hat, bp[:, 1])
 
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
@@ -106,7 +107,7 @@ def val_epoch(model, optimizer, val_dataloader):
 
 def train(opt):
     # load param
-    best_lost = opt.best_lost
+    best_loss = opt.best_loss
     lr = opt.lr
     start_epoch = opt.start_epoch
     stage = opt.stage
@@ -161,8 +162,8 @@ def train(opt):
 
         states.append(state)
 
-        save_ckpt(state, best_lost > val_loss, model_save_dir)
-        best_lost = min(best_lost, val_loss)
+        save_ckpt(state, best_loss > val_loss, model_save_dir)
+        best_loss = min(best_loss, val_loss)
 
         if epoch in step:
             stage += 1
@@ -176,11 +177,11 @@ def train(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--model", type=str, default='resnet18', help="model type")
-    parser.add_argument("-d", "--describe", type=str, default='lr=1e-3', help="describe for this model")
+    parser.add_argument("-t", "--model", type=str, default='resnet50', help="model type")
+    parser.add_argument("-d", "--describe", type=str, default='rebuild', help="describe for this model")
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
     parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
-    parser.add_argument("-bl", "--best_lost", type=int, default=1e3, help="best_lost")
+    parser.add_argument("-bl", "--best_loss", type=int, default=1e3, help="best_loss")
     parser.add_argument("-lr", "--lr", type=int, default=1e-3, help="learning rate")
     parser.add_argument("-se", "--start_epoch", type=int, default=1, help="start_epoch")
     parser.add_argument("-st", "--stage", type=int, default=1, help="stage")
