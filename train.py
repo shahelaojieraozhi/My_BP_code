@@ -24,7 +24,7 @@ from torch.utils.data import DataLoader
 import utils
 # from model.resnet18_1D import resnet18_1d
 # from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
-from PPG2BP_Dataset import PPG2BPDataset
+from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 from model.bp_MSR_Net import MSResNet
 from model.ppg2bp_net import resnet18_1d
 from model.bpnet_cvprw import resnet50
@@ -55,7 +55,7 @@ def save_ckpt(state, is_best, model_save_dir):
     if is_best: shutil.copyfile(current_w, best_w)
 
 
-def train_epoch(model, optimizer, train_dataloader, show_interval=10):
+def train_epoch(model, optimizer, train_dataloader, if_derivative, show_interval=10):
     model.train()
     loss_meter, it_count = 0, 0
 
@@ -63,6 +63,7 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
         ppg = ppg.to(device)
         ppg = ppg.unsqueeze(dim=0)
         ppg = torch.transpose(ppg, 1, 0)
+        ppg = use_derivative(ppg) if if_derivative else ppg
         bp_hat = model(ppg).cpu()
         dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
         optimizer.zero_grad()
@@ -83,7 +84,7 @@ def train_epoch(model, optimizer, train_dataloader, show_interval=10):
     return loss_meter / it_count
 
 
-def val_epoch(model, optimizer, val_dataloader):
+def val_epoch(model, optimizer, val_dataloader, if_derivative):
     model.eval()
     loss_meter, it_count = 0, 0
     with torch.no_grad():
@@ -91,6 +92,7 @@ def val_epoch(model, optimizer, val_dataloader):
             ppg = ppg.to(device)
             ppg = ppg.unsqueeze(dim=0)
             ppg = torch.transpose(ppg, 1, 0)
+            ppg = use_derivative(ppg) if if_derivative else ppg
             bp_hat = model(ppg).cpu()
             dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]
             optimizer.zero_grad()
@@ -121,10 +123,12 @@ def train(opt):
 
     # model = resnet18()
     # model = resnet50()
-    model = resnet18_1d()
-    model = model.to(device)
-    # model = MSResNet(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
+    # model = resnet18_1d()
     # model = model.to(device)
+
+    input_channel = 3 if opt.using_derivative else 1
+    model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
+    model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
     model_save_dir = f'save/{opt.model}_{opt.describe}_{time.strftime("%Y%m%d%H")}'
@@ -140,14 +144,15 @@ def train(opt):
     train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=0)
 
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    # optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
 
     states = []
 
     for epoch in range(start_epoch, opt.n_epochs):
         since = time.time()
-        train_loss = train_epoch(model, optimizer, train_loader, 50)
-        val_loss = val_epoch(model, optimizer, val_loader)
+        train_loss = train_epoch(model, optimizer, train_loader, opt.using_derivative, 50)
+        val_loss = val_epoch(model, optimizer, val_loader, opt.using_derivative)
 
         print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s\n'
               % (epoch, stage, train_loss, val_loss, utils.print_time_cost(since)))
@@ -177,8 +182,8 @@ def train(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--model", type=str, default='resnet50', help="model type")
-    parser.add_argument("-d", "--describe", type=str, default='rebuild', help="describe for this model")
+    parser.add_argument("-t", "--model", type=str, default='MSR_derivative', help="model type")
+    parser.add_argument("-d", "--describe", type=str, default='drop_0.5', help="describe for this model")
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
     parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
     parser.add_argument("-bl", "--best_loss", type=int, default=1e3, help="best_loss")
@@ -187,6 +192,7 @@ if __name__ == '__main__':
     parser.add_argument("-st", "--stage", type=int, default=1, help="stage")
     parser.add_argument("-ds", "--decay_step", type=list, default=[50], help="decay step list of learning rate")
     parser.add_argument("-wd", "--weight_decay", type=int, default=2, help="weight_decay")
+    parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     args = parser.parse_args()
     print(f'args: {vars(args)}')
     train(args)

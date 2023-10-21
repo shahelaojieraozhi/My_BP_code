@@ -91,7 +91,7 @@ class MultiHeadAttention(nn.Module):
         outputs = torch.einsum('bnmh,bmhd->bnhd', attention, values).reshape(b, n, d_query)
         # (batch_size, n_seq, d_query)   (80, 20, 768)
 
-        outputs = self.project(outputs)     # (80, 20, 768)
+        outputs = self.project(outputs)  # (80, 20, 768)
         return outputs, attention
 
 
@@ -166,6 +166,7 @@ class MappingNetwork(nn.Module):
         self.linear = nn.Linear(clip_hidden_size, clip_project_length * d_model)
         # learnable prefix embeddings
         self.prefix_const = nn.Parameter(torch.randn(prefix_length, d_model), requires_grad=True)
+        # self.prefix_const1 = nn.Parameter(torch.randn(4, 256), requires_grad=True)
         self.transformer = Transformer(d_model, num_layers, num_heads)
         """
         d_model = 768
@@ -183,12 +184,16 @@ class MappingNetwork(nn.Module):
         # x shape: (80, 512)
         # t = self.linear(x)      # (80, 7680)
         x = self.linear(x).view(x.shape[0], self.clip_project_length, -1)
+
         # (b, clip_project_length, d_model)  (80, 10, 768)
 
         # g = self.prefix_const   # (10, 768)
         # h = self.prefix_const.unsqueeze(dim=0)   # (1, 10, 768)
         prefix = self.prefix_const.unsqueeze(dim=0).expand(x.shape[0],
                                                            *self.prefix_const.shape)
+
+        # prefix = self.prefix_const1.unsqueeze(dim=0).expand(x.shape[0],
+        #                                                     *self.prefix_const1.shape)
         # (b, prefix_length, d_model)   (80, 10, 768)
 
         inputs = torch.cat((x, prefix), dim=1)  # (b, clip_project_length + prefix_length, d_model)
@@ -208,7 +213,7 @@ if __name__ == '__main__':
     num_layers = 8
     num_heads = 8
     gpt_hidden_size = 768
-    continuous_prompt = torch.rand(2048, 512)
+    continuous_prompt = torch.rand(2048, 4, 256)
     mapping_network = MappingNetwork(clip_project_length, clip_hidden_size, continuous_length,
                                      gpt_hidden_size, num_layers, num_heads)
 

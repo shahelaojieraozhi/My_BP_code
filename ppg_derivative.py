@@ -32,3 +32,4 @@ if __name__ == '__main__':
     inputs = torch.rand(1024, 1, 875)
     fs = 125
     y = use_derivative(inputs, fs)
+    print()

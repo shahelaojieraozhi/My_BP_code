@@ -168,7 +168,7 @@ class MSResNet(nn.Module):
         # self.maxpool7 = nn.AvgPool1d(kernel_size=6, stride=1, padding=0)
 
         # self.drop = nn.Dropout(p=0.2)
-        self.drop = nn.Dropout(0.2)
+        self.drop = nn.Dropout(0.5)
 
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         """
@@ -270,13 +270,13 @@ class MSResNet(nn.Module):
         out = out.squeeze()  # (1024, 768)
         out = self.drop(out)
         out = self.fc(out)  # (1024, 6)
-        out = self.sigmoid(out)  # (2048, 2)
+        # out = self.sigmoid(out)  # (2048, 2)
 
         return out
 
 
 if __name__ == '__main__':
-    msresnet = MSResNet(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
-    inputs = torch.rand(1024, 1, 875)
+    msresnet = MSResNet(input_channel=3, layers=[1, 1, 1, 1], num_classes=2)
+    inputs = torch.rand(1024, 3, 875)
     outputs = msresnet(inputs)
     print(outputs[0].size(), outputs[1].size())

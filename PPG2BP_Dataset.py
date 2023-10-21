@@ -22,20 +22,38 @@ def normalization(ori_data):
     return scaler.fit_transform(ori_data)
 
 
+def use_derivative(x_input, fs=125):
+    """
+    X_input: (None, 1, 875)
+    fs     : 125
+    """
+    dt1 = (x_input[:, :, 1:] - x_input[:, :, :-1]) * fs  # (None, 874, 1)  ———pad———> (None, 875, 1)
+    dt2 = (dt1[:, :, 1:] - dt1[:, :, :-1]) * fs  # (None, 873, 1)  ———pad———> (None, 875, 1)
+
+    # under padding
+    padded_dt1 = torch.nn.functional.pad(dt1, (0, 1, 0, 0), value=0)
+    padded_dt2 = torch.nn.functional.pad(dt2, (0, 2, 0, 0), value=0)
+    # (0, 0, 0, 1) Indicates the fill size of the left, right, top and bottom edges, respectively
+
+    x = torch.cat([x_input, padded_dt1, padded_dt2], dim=1)
+    return x
+
+
 class PPG2BPDataset(Dataset):
     """
     A generic data loader where the samples are arranged in this way:
     dd = {'train': train, 'val': val, "idx2name": idx2name, 'file2idx': file2idx}
     """
 
-    def __init__(self, path):
+    def __init__(self, path, fs=125, using_derivative=True):
         super(PPG2BPDataset, self).__init__()
 
         # self.SBP_min = 40
         # self.SBP_max = 200
         # self.DBP_min = 40
         # self.DBP_max = 120
-
+        self.using_derivative = using_derivative
+        self.fs = fs
         self.file_count = 0
         path = path
         self.h5_path_list = os.listdir(path)
@@ -58,6 +76,7 @@ class PPG2BPDataset(Dataset):
         ppg_pulse = self.ppg[index, :]
         bp = self.BP[index, :]
 
+        """ if normalization ?"""
         # sbp = (bp[0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
         # dbp = (bp[1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
 

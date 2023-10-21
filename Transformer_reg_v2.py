@@ -28,8 +28,8 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, x):
         positions = torch.arange(0, x.shape[1], device=x.device).unsqueeze(0)
-        a = self.embedding(torch.LongTensor(x))
-        b = self.position_embedding(positions)
+        # a = self.embedding(torch.LongTensor(x))
+        # b = self.position_embedding(positions)
         x = self.embedding(torch.LongTensor(x)) + self.position_embedding(positions)
         for layer in self.layers:
             x = layer(x)
@@ -60,3 +60,7 @@ class RegressionTransformer(nn.Module):
 #
 # # 打印模型结构
 # print(model)
+
+if __name__ == '__main__':
+    inputs = torch.rand([2048, 1, 875])
+    model = RegressionTransformer(inputs, )
