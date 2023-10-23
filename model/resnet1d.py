@@ -185,7 +185,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def _forward_impl(self, x):
-        x = torch.transpose(x, 1, 2)  # dimensions: [B, length, C] to [B, C, length]
+        # x = torch.transpose(x, 1, 2)  # dimensions: [B, length, C] to [B, C, length]
 
         # See note [TorchScript super()]
         x = self.conv1(x)

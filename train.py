@@ -26,8 +26,10 @@ import utils
 # from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 from model.bp_MSR_Net import MSResNet
-from model.ppg2bp_net import resnet18_1d
-from model.bpnet_cvprw import resnet50
+# from model.ppg2bp_net import resnet18_1d
+# from model.bpnet_cvprw import resnet50
+# from model.resnet1d import resnet50
+from model.MSR_tranformer_bp import MSR_tf_bp
 
 warnings.filterwarnings("ignore")
 
@@ -36,7 +38,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def seed_torch(seed=666):
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)  # 为了禁止hash随机化，使得实验可复现
+    os.environ['PYTHONHASHSEED'] = str(seed)  # To prohibit hash randomization and make the experiment replicable
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -122,12 +124,13 @@ def train(opt):
     # model = resnet34_1d().to(device)
 
     # model = resnet18()
-    # model = resnet50()
+    # model = resnet50(num_input_channels=1, num_classes=2)
     # model = resnet18_1d()
     # model = model.to(device)
 
     input_channel = 3 if opt.using_derivative else 1
-    model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
+    model = MSR_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
+    # model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
     model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
@@ -144,8 +147,8 @@ def train(opt):
     train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=0)
 
-    # optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    # optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     states = []
 
@@ -182,10 +185,10 @@ def train(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--model", type=str, default='MSR_derivative', help="model type")
-    parser.add_argument("-d", "--describe", type=str, default='drop_0.5', help="describe for this model")
+    parser.add_argument("-t", "--model", type=str, default='MSR_tf-bp', help="model type")
+    parser.add_argument("-d", "--describe", type=str, default='ori', help="describe for this model")
     parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
+    parser.add_argument("-b", "--batch", type=int, default=128, help="batch size of training")
     parser.add_argument("-bl", "--best_loss", type=int, default=1e3, help="best_loss")
     parser.add_argument("-lr", "--lr", type=int, default=1e-3, help="learning rate")
     parser.add_argument("-se", "--start_epoch", type=int, default=1, help="start_epoch")
