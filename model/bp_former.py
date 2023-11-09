@@ -171,17 +171,13 @@ class Bottleneck1D(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, depth, num_classes=4, block_name='BasicBlock'):
+    def __init__(self, num_classes=2, block_name='BasicBlock'):
         super(ResNet, self).__init__()
         # Model type specifies number of layers for ecg model
         if block_name.lower() == 'basicblock':
-            assert (depth - 2) % 6 == 0, 'When use basicblock, depth should be 6n+2, e.g. 20, 32, 44, 56, 110, 1202'
-            n = (depth - 2) // 6
             block = BasicBlock
             block_ecg = BasicBlock1D
         elif block_name.lower() == 'bottleneck':
-            assert (depth - 2) % 9 == 0, 'When use bottleneck, depth should be 9n+2, e.g. 20, 29, 47, 56, 110, 1199'
-            n = (depth - 2) // 9
             block = Bottleneck
             block_ecg = Bottleneck1D
         else:
@@ -192,41 +188,16 @@ class ResNet(nn.Module):
 
         self.inplanes = 16
         self.inplanes_ecg = 16
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1,
-                               bias=False)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool1 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 16, n)
-        self.layer2 = self._make_layer(block, 32, n, stride=2)
-        self.layer3 = self._make_layer(block, 64, n, stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
-
         self.fc = nn.Linear(64 * block.expansion, 32 * block.expansion)
         self.fc_final = nn.Linear(32 * block.expansion, num_classes)
-        self.fca1 = nn.Linear(100, 128)
-        self.fca2 = nn.Linear(128, 256 * block.expansion)
-        self.fca3 = nn.Linear(256, 512 * block.expansion)
-        self.fca4 = nn.Linear(512, 256 * block.expansion)
-        self.fca5 = nn.Linear(256, 128 * block.expansion)
-        self.fca6 = nn.Linear(128, 64 * block.expansion)
-        self.time_steps = 10
-        self.fcg1 = nn.Linear(50, 128)
-        self.fcg2 = nn.Linear(128, 256 * block.expansion)
-        self.fcg3 = nn.Linear(256, 512 * block.expansion)
-        self.fcg4 = nn.Linear(512, 256 * block.expansion)
-        self.fcg5 = nn.Linear(256, 128 * block.expansion)
-        self.fcg6 = nn.Linear(128, 64 * block.expansion)
-        self.fc_concat = nn.Linear(64 * block.expansion * 3, 64 * block.expansion)
-        self.lstm = nn.LSTM(input_size=64 * block.expansion, hidden_size=64 * block.expansion, num_layers=6,
-                            batch_first=True, bidirectional=True)
+        self.time_steps = 7
         self.hidden_cell = None
-
         self.lstm_ecg = nn.LSTM(input_size=64 * block.expansion, hidden_size=64 * block.expansion, num_layers=2,
                                 batch_first=True)
 
         self.conv1ecg = nn.Conv1d(3, 16, kernel_size=3, padding=1, bias=False)
         self.bn1ecg = nn.BatchNorm1d(16)
+        self.relu = nn.ReLU(inplace=True)
         self.layer1ecg = self._make_layer_1d(block_ecg, 16, 3)
         self.layer2ecg = self._make_layer_1d(block_ecg, 32, 3, stride=2)
         self.layer3ecg = self._make_layer_1d(block_ecg, 64, 3, stride=2)
@@ -236,13 +207,13 @@ class ResNet(nn.Module):
         self.transformerEncoder = nn.TransformerEncoder(encoder_layer, num_layers=3)
         self.drop = nn.Dropout(0.5)
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        #         m.weight.data.normal_(0, math.sqrt(2. / n))
+        #     elif isinstance(m, nn.BatchNorm2d):
+        #         m.weight.data.fill_(1)
+        #         m.bias.data.zero_()
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
@@ -277,17 +248,31 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, w, init_states=None):
+    def forward(self, w):  # (b, 3, 875)
+        batch_size = w.size(0)  # batch_size = b
+        channel_size = w.size(1)
+        time_steps = 7
 
-        # w = w.view(self.batch_size * self.time_steps, w.size(2), w.size(3))  # w ori:(5, 10, 1, 360)   (50, 1, 360)
-        w = self.conv1ecg(w)  # (50, 16, 360)
-        w = self.bn1ecg(w)  #
+        # k = w.view(batch_size * time_steps, w.size(1), int(w.size(2) / time_steps))    # one step
+
+        w = w.view(batch_size, channel_size, int(w.size(2) / time_steps), time_steps)
+        # segment ppg   shape:(b, c, 125, 7)
+        w = w.transpose(1, 3)  # (b, 7, 125, c)
+        w = w.transpose(2, 3)  # (b, 7, c, 125)
+        w = w.contiguous().view(batch_size * time_steps, w.size(2), w.size(3))  # w ori:(b, 7, c, 125)   (b * 7, c, 125)
+
+        w = self.conv1ecg(w)  # (b, 16, 875)
+        w = self.bn1ecg(w)    #
         w = self.relu(w)
-        w = self.layer1ecg(w)  # (50, 16, 360)
-        w = self.layer2ecg(w)  # # (50, 32, 360)
-        w = self.layer3ecg(w)  # (50, 64, 360)
-        w = self.avgpoolecg(w)  # (50, 64, 1)
-        w = torch.squeeze(w)  # (50, 64)
+        w = self.layer1ecg(w)  # (b, 16, 875)
+        w = self.layer2ecg(w)  # (b, 32, 438)
+        w = self.layer3ecg(w)  # (b, 64, 219)
+        w = self.avgpoolecg(w)  # (b, 64, 1)
+        w = torch.squeeze(w)  # (b, 64)
+
+        w = w.view(batch_size, time_steps, w.size(1))  # (b, 7, 64)
+        w, (h0, b0) = self.lstm_ecg(w, self.hidden_cell)  # w:(5, 10, 64)   h0:(2, 5, 64) b0:(2, 5 ,64)
+        w = h0[-1, :, :]  # (5, 64)
 
         x = self.transformerEncoder(w)  # (4, 5, 64)
         # x = torch.mean(x, dim=0)  # (5, 64)
@@ -306,7 +291,7 @@ def resnet_lstm_mitbih(**kwargs):
 
 
 if __name__ == '__main__':
-    model = resnet_lstm_mitbih(num_classes=2, depth=110, block_name='BasicBlock')
-    inputs = torch.rand(1024, 3, 875)
+    model = resnet_lstm_mitbih(num_classes=2, block_name='BasicBlock')
+    inputs = torch.rand(5, 3, 875)
     outputs = model(inputs)
     print(outputs.size())

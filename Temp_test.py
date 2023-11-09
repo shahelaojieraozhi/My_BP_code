@@ -32,10 +32,11 @@
 # print(torch.cuda.is_available())  # cuda是否可用
 # print(torch.version.cuda)  # cuda版本
 
-import torch
+# import torch
+#
+# inputs = torch.rand(1024, 874, 1)
+# padded_x = torch.nn.functional.pad(inputs, (0, 0, 0, 2), value=0)
 
-inputs = torch.rand(1024, 874, 1)
-padded_x = torch.nn.functional.pad(inputs, (0, 0, 0, 2), value=0)
 
 # # 创建一个示例张量
 # x = torch.tensor([[1, 2], [3, 4]])
@@ -47,4 +48,46 @@ padded_x = torch.nn.functional.pad(inputs, (0, 0, 0, 2), value=0)
 # 填充的大小参数是一个元组，包含了四个值，分别表示左边、右边、上边和下边的填充大小。
 # 在示例中，(1, 2, 1, 2) 表示在左边添加 1 列，右边添加 2 列，上边添加 1 行，下边添加 2 行的填充。
 # """
-print(padded_x.shape)
+# print(padded_x.shape)
+
+
+# print("aad", end='\n')
+# print("aadxx")
+import numpy as np
+import torch
+
+# x = torch.tensor([1, 2, 3])
+# xx = x.repeat(3, 2, 1)  # 将一维度的x向量扩展到三维
+# print(xx)
+
+# import torch
+# x = torch.tensor([1, 2, 3])
+# x1 = x.repeat(3)
+# print("x1:\n", x1)
+# x2 = x.repeat(3, 1)
+# print("x2:\n", x2)
+# x3 = x.repeat(3, 2)
+# print("x3:\n", x3)
+# x4 = x.repeat(3, 2, 1)
+# print("x4:\n", x4)
+
+
+# import torch
+#
+# x = torch.tensor([[1, 2, 3], [4, 5, 6]])
+# x1 = x.repeat_interleave(3, 0)
+# print("x1:\n", x1)
+#
+# x2 = x.repeat_interleave(3, 1)
+# print("x2:\n", x2)
+
+
+SBP_min = 4
+SBP_max = 12
+DBP_min = 4
+DBP_max = 12
+
+bp = np.arange(12).reshape(6, 2)
+sbp = (bp[:, 0] - SBP_min) / (SBP_max - SBP_min)
+dbp = (bp[:, 1] - DBP_min) / (DBP_max - DBP_min)
+

@@ -67,10 +67,10 @@ class BottleneckBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, layers, num_classes=2):
+    def __init__(self, block, layers, input_c=3, num_classes=2):
         super(ResNet, self).__init__()
         self.in_channels = 64
-        self.conv1 = nn.Conv1d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv1d(input_c, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm1d(64)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], stride=1)
@@ -101,29 +101,29 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
+def resnet18(input_c, num_classes):
+    return ResNet(BasicBlock, [2, 2, 2, 2], input_c, num_classes=num_classes)
 
 
-def resnet34():
-    return ResNet(BasicBlock, [3, 4, 6, 3])
+def resnet34(input_c, num_classes):
+    return ResNet(BasicBlock, [3, 4, 6, 3], input_c, num_classes=num_classes)
 
 
-def resnet50():
-    return ResNet(BottleneckBlock, [3, 4, 6, 3])
+def resnet50(input_c, num_classes):
+    return ResNet(BottleneckBlock, [3, 4, 6, 3], input_c, num_classes=num_classes)
 
 
-def resnet101():
-    return ResNet(BottleneckBlock, [3, 4, 23, 3])
+def resnet101(input_c, num_classes):
+    return ResNet(BottleneckBlock, [3, 4, 23, 3], input_c, num_classes=num_classes)
 
 
-def resnet152():
-    return ResNet(BottleneckBlock, [3, 8, 36, 3])
+def resnet152(input_c, num_classes):
+    return ResNet(BottleneckBlock, [3, 8, 36, 3], input_c, num_classes=num_classes)
 
 
 if __name__ == '__main__':
     # Create an instance of the ResNet18 model
-    model = resnet50()
+    model = resnet50(input_c=3, num_classes=3)
 
     # Generate a random input signal of length 875
     input_signal = torch.randn(100, 1, 875)

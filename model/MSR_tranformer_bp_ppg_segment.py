@@ -9,7 +9,6 @@
 
 """
 import math
-
 import torch.nn as nn
 import torch
 
@@ -130,7 +129,7 @@ class BasicBlock7x7(nn.Module):
         return out1
 
 
-class msr_tf_bp(nn.Module):
+class msr_tf_bp_ppg_segment(nn.Module):
     def __init__(self, input_channel, layers=[1, 1, 1, 1], num_classes=10):
         """
         inplanes 是提供给block的通道数，planes表示block的输出通道。
@@ -141,7 +140,7 @@ class msr_tf_bp(nn.Module):
         self.inplanes5 = 64
         self.inplanes7 = 64
 
-        super(msr_tf_bp, self).__init__()
+        super(msr_tf_bp_ppg_segment, self).__init__()
 
         self.conv1 = nn.Conv1d(input_channel, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
@@ -170,17 +169,19 @@ class msr_tf_bp(nn.Module):
         # self.maxpool7 = nn.AvgPool1d(kernel_size=6, stride=1, padding=0)
 
         # self.drop = nn.Dropout(p=0.2)
-        self.drop = nn.Dropout(0.2)
+        self.drop = nn.Dropout(0.5)
 
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         """
         self.avgpool = nn.AdaptiveAvgPool1d(H, w)   nn.AdaptiveAvgPool1d(1) 即为 (1, 1)
         自适应池化, 对输入信号，提供自适应平均池化操作 对于任何输入大小的输入，可以将输出尺寸指定为H*W， 但是输入和输出特征的数目不会变化。
         """
-        self.fc = nn.Linear(256, num_classes)
+        self.fc1 = nn.Linear(128*7*3, 128*7)
+        self.fc2 = nn.Linear(128*7, 128)
+        self.fc3 = nn.Linear(128, num_classes)
         self.sigmoid = nn.Sigmoid()
 
-        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=8)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=128, nhead=8)
         self.transformerEncoder = nn.TransformerEncoder(encoder_layer, num_layers=3)
 
         # todo: modify the initialization
@@ -244,6 +245,19 @@ class msr_tf_bp(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x0):  # (1024, 1, 512)
+        batch_size = x0.size(0)  # batch_size = b
+        channel_size = x0.size(1)
+        time_steps = 7
+
+        # k = w.view(batch_size * time_steps, w.size(1), int(w.size(2) / time_steps))    # one step
+
+        x0 = x0.view(batch_size, channel_size, int(x0.size(2) / time_steps), time_steps)
+        # segment ppg   shape:(b, c, 125, 7)
+        x0 = x0.transpose(1, 3)  # (b, 7, 125, c)
+        x0 = x0.transpose(2, 3)  # (b, 7, c, 125)
+        x0 = x0.contiguous().view(batch_size * time_steps, x0.size(2), x0.size(3))
+        # w ori:(b, 7, c, 125)   (b * 7, c, 125)  (35, 3, 125)
+
         x0 = self.conv1(x0)  # (1024, 64, 256)
         x0 = self.bn1(x0)
         x0 = self.relu(x0)
@@ -251,46 +265,40 @@ class msr_tf_bp(nn.Module):
 
         x = self.layer3x3_1(x0)  # (1024, 64, 64)
         x = self.layer3x3_2(x)  # (1024, 128, 32)
-        x = self.layer3x3_3(x)  # (1024, 256, 16)
+        # x = self.layer3x3_3(x)  # (1024, 256, 16)
         # x = self.layer3x3_4(x)
         # x = self.maxpool3(x)  # (1024, 256, 1)
         x = self.avgpool(x)  # (1024, 256, 1)
 
         y = self.layer5x5_1(x0)  # (1024, 64, 61)
         y = self.layer5x5_2(y)  # (1024, 128, 28)
-        y = self.layer5x5_3(y)  # (1024, 256, 11)
+        # y = self.layer5x5_3(y)  # (1024, 256, 11)
         # y = self.layer5x5_4(y)
         # y = self.maxpool5(y)  # (1024, 256, 1)
         y = self.avgpool(y)  # (1024, 256, 1)
 
         z = self.layer7x7_1(x0)  # (1024, 64, 58)
         z = self.layer7x7_2(z)  # (1024, 128, 23)
-        z = self.layer7x7_3(z)  # (1024, 256, 6)
+        # z = self.layer7x7_3(z)  # (1024, 256, 6)
         # z = self.layer7x7_4(z)
         # z = self.maxpool7(z)  # (1024, 256, 1)
         z = self.avgpool(z)  # (1024, 256, 1)
 
-        # out = torch.cat([x, y, z], dim=2)  # (1024, 256, 3)
-        out = torch.transpose(x, 0, 2)   # (3, 256, 1024)
-        out = torch.transpose(out, 1, 2)   # (3, 1024, 256)
-
-        out = self.transformerEncoder(out)
-        out = torch.transpose(out, 0, 1)   # (3, 1024, 256)
-        out = out.view(x0.size(0), -1)   # (batch_size, -1)
-
-        # out = torch.cat([x, y, z], dim=1)  # (1024, 768, 1)
-        # out = torch.mean(out, dim=0)        # (5, 64)
-        # out = out.squeeze()  # (1024, 768)
-
+        out = torch.cat([x, y, z], dim=1)  # (b, 128, 3)
+        out = out.view(batch_size, time_steps, -1)  # (b, 7, 64)
+        out = out.view(batch_size, -1)  # (b, 7, 64)
         out = self.drop(out)
-        out = self.fc(out)  # (1024, 6)
-        # out = self.sigmoid(out)  # (2048, 2)
+        out = self.fc1(out)  # (1024, 6)
+        out = self.drop(out)
+        out = self.fc2(out)  # (1024, 6)
+        out = self.drop(out)
+        out = self.fc3(out)  # (1024, 6)
 
         return out
 
 
 if __name__ == '__main__':
-    msresnet = msr_tf_bp(input_channel=3, layers=[1, 1, 1, 1], num_classes=2)
-    inputs = torch.rand(1024, 3, 875)
+    msresnet = msr_tf_bp_ppg_segment(input_channel=3, layers=[1, 1, 1, 1], num_classes=2)
+    inputs = torch.rand(5, 3, 875)
     outputs = msresnet(inputs)
     print(outputs.size())
