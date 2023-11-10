@@ -53,6 +53,8 @@
 
 # print("aad", end='\n')
 # print("aadxx")
+import datetime
+
 import numpy as np
 import torch
 
@@ -82,12 +84,17 @@ import torch
 # print("x2:\n", x2)
 
 
-SBP_min = 4
-SBP_max = 12
-DBP_min = 4
-DBP_max = 12
+# SBP_min = 4
+# SBP_max = 12
+# DBP_min = 4
+# DBP_max = 12
+#
+# bp = np.arange(12).reshape(6, 2)
+# sbp = (bp[:, 0] - SBP_min) / (SBP_max - SBP_min)
+# dbp = (bp[:, 1] - DBP_min) / (DBP_max - DBP_min)
 
-bp = np.arange(12).reshape(6, 2)
-sbp = (bp[:, 0] - SBP_min) / (SBP_max - SBP_min)
-dbp = (bp[:, 1] - DBP_min) / (DBP_max - DBP_min)
+# input_channel = 3
+# a = 1 if input_channel == 1 else 3
+# print(a)
 
+print(datetime.datetime.now())

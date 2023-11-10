@@ -8,6 +8,7 @@
 @IDE     ：PyCharm 
 
 """
+import datetime
 import os
 import random
 import shutil
@@ -131,7 +132,8 @@ def train(opt):
     # model = resnet50(num_input_channels=1, num_classes=2)
     # model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
     # model = resnet18()
-    model = resnet50(input_c=3, num_classes=2)
+    # model = resnet50(input_c=3, num_classes=2)
+    model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
     model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
@@ -195,6 +197,7 @@ def train(opt):
             utils.adjust_learning_rate(optimizer, lr)
 
     # torch.save(states, f'./save/resnet18_1D_states.pth')
+    print(datetime.datetime.now())
 
 
 if __name__ == '__main__':
@@ -209,7 +212,7 @@ if __name__ == '__main__':
     parser.add_argument("-st", "--stage", type=int, default=1, help="stage")
     parser.add_argument("-ds", "--decay_step", type=list, default=[100], help="decay step list of learning rate")
     parser.add_argument("-wd", "--weight_decay", type=int, default=2, help="weight_decay")
-    parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
+    parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
     parser.add_argument('--show_interval', type=int, default=50, help='how long to show the loss value')
     args = parser.parse_args()
     print(f'args: {vars(args)}')

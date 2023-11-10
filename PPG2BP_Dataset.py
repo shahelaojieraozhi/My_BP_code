@@ -44,14 +44,12 @@ class PPG2BPDataset(Dataset):
         self.SBP_max = 200
         self.DBP_min = 40
         self.DBP_max = 120
-
         self.h5_path_list = os.listdir(path)
-        sample_count = len(self.h5_path_list)
 
         self.ppg = []
         self.BP = []
-        for idx in range(sample_count):
-            with h5py.File(os.path.join(path, self.h5_path_list[idx]), 'r') as f:
+        for h5_path in self.h5_path_list:
+            with h5py.File(os.path.join(path, h5_path), 'r') as f:
                 ppg = f.get('/ppg')[:].astype(np.float32)
                 bp = f.get('/label')[:].astype(np.float32)
                 self.ppg.append(ppg)
@@ -61,8 +59,10 @@ class PPG2BPDataset(Dataset):
         self.ppg = torch.from_numpy(self.ppg)
         self.BP = torch.from_numpy(self.BP)
 
-        self.sbp = (self.BP[:, 0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
-        self.dbp = (self.BP[:, 1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
+        # self.sbp = (self.BP[:, 0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
+        # self.dbp = (self.BP[:, 1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
+        self.sbp = self.BP[:, 0]
+        self.dbp = self.BP[:, 1]
 
     def __getitem__(self, index):
         ppg = self.ppg[index, :]
@@ -88,5 +88,5 @@ if __name__ == '__main__':
     data_root_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test"
     data = PPG2BPDataset(data_root_path)
     datasize = len(data)
-    pulse, sbp, dbp = data[1]
-    b = data[0]
+    # pulse, sbp, dbp = data[1]
+    # b = data[0]
