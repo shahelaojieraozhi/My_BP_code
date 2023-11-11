@@ -15,8 +15,11 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from model.resnet18_1D import resnet18_1d
-from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
-from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
+# from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
+# from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
+
+from PPG2BP_Dataset import PPG2BPDataset, use_derivative
+from model.bpnet_cvprw import resnet50
 import os
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
@@ -30,52 +33,39 @@ plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def loss_calculate(pre, label, loss_name='mse'):
+    if loss_name == 'mse':
+        return F.mse_loss(pre, label)
+    elif loss_name == "SmoothL1Loss":
+        smooth_l1_loss = torch.nn.SmoothL1Loss()
+        return smooth_l1_loss(pre, label)
+
+
 def inv_normalize(sbp_arr, dbp_arr):
     sbp_min = 40
     sbp_max = 200
     dbp_min = 40
     dbp_max = 120
-
     sbp_arr = sbp_arr * (sbp_max - sbp_min) + sbp_min
     dbp_arr = dbp_arr * (dbp_max - dbp_min) + dbp_min
-
     return sbp_arr, dbp_arr
 
 
-def test(model_name, pre_path):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--n_epochs", type=int, default=30, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
-    parser.add_argument("-t", "--type", type=str, default='cnn', help="model type")
-    parser.add_argument("-m", "--model", type=str, default='v1', help="model to execute")
-    opt = parser.parse_args()
-
+def test(model, opt, pre_path):
     print('loading data...')
-    test_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test"
-    test_data = PPG2BPDataset(test_data_path)
-    test_loader = DataLoader(test_data, batch_size=opt.batch, shuffle=True, num_workers=0)
-
-    "model"
-    resnet_1d = resnet18_1d()
-    # resnet_1d = resnet50()
-    model = resnet_1d.to(device)
-
-    # model.load_state_dict(torch.load('save/cnn_202307111750/best_w.pth')['state_dict'])     # 18
-    # model.load_state_dict(torch.load('save/cnn_202307120933/best_w.pth')['state_dict'])     # 34
-    # model.load_state_dict(torch.load('logs/res18_ks=7,val_oss=637.7/best_w.pth')['state_dict'])
-    model.load_state_dict(torch.load('logs/' + model_name + '/best_w.pth')['state_dict'])
-    best_epoch = torch.load('logs/' + model_name + '/best_w.pth')["epoch"]
-    print(best_epoch)
-
+    test_data = PPG2BPDataset(opt.test_data_path)
+    test_loader = DataLoader(test_data, batch_size=opt.batch, num_workers=0)
     model.eval()
+
     loss_meter, it_count = 0, 0
     test_batch_idx = 0
-
     with torch.no_grad():
         for (ppg, sbp, dbp) in test_loader:
+            ppg = use_derivative(ppg) if opt.using_derivative else ppg
             ppg = ppg.to(device)
             bp_hat = model(ppg).cpu()
             sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+            # dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]  # error
 
             sbp_hat_arr = sbp_hat.numpy()
             dbp_hat_arr = dbp_hat.numpy()
@@ -83,16 +73,17 @@ def test(model_name, pre_path):
             sbp_arr = sbp.numpy()
             dbp_arr = dbp.numpy()
 
-            sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
-            sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
+            # sbp_arr, dbp_arr = inv_normalize(sbp_arr, dbp_arr)
+            # sbp_hat_arr, dbp_hat_arr = inv_normalize(sbp_hat_arr, dbp_hat_arr)
 
             table_arr = np.vstack((sbp_hat_arr, dbp_hat_arr, sbp_arr, dbp_arr)).T
 
             pd.DataFrame(table_arr).to_csv(pre_path + "/predict_test_{}.csv".format(test_batch_idx),
                                            header=['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr'], index=False)
+            print("predict_test_{}.csv is written".format(test_batch_idx))
 
-            loss_sbp = F.mse_loss(sbp_hat, sbp)
-            loss_dbp = F.mse_loss(dbp_hat, dbp)
+            loss_sbp = loss_calculate(sbp_hat, sbp, opt.loss_func)
+            loss_dbp = loss_calculate(dbp_hat, dbp, opt.loss_func)
 
             loss = loss_dbp + loss_sbp
             loss_meter += loss.item()
@@ -198,12 +189,38 @@ def evaluate(test_path):
 
 
 if __name__ == '__main__':
-    model_name = "new"
-    pre_path = os.path.join("predict_test", model_name)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
+    # logs/11_9_add_wd/best_w.pth
+    parser.add_argument("-m", "--model_name", type=str, default='default_seed=888', help="model name")  # best
+    # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no', help="model to execute")
+    parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
+    parser.add_argument('--loss_func', type=str, default='SmoothL1Loss', help='which loss function is selected')
+    parser.add_argument("-tp", "--test_data_path", type=str,
+                        default='G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test', help="test data path")
+    opt = parser.parse_args()
+
+    input_channel = 3 if opt.using_derivative else 1
+    "model"
+    # resnet_1d = resnet18_1d()
+    # resnet_1d = resnet50()
+    # model = resnet_1d.to(device)
+    # model = resnet50(num_input_channels=1, num_classes=2)
+    # model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
+    # model = resnet18()
+    model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
+    model = model.to(device)
+
+    "load model"
+    model.load_state_dict(torch.load('logs/' + opt.model_name + '/best_w.pth')['state_dict'])
+    best_epoch = torch.load('logs/' + opt.model_name + '/best_w.pth')["epoch"]
+    pre_path = os.path.join("predict_test", opt.model_name)
     os.makedirs(pre_path, exist_ok=True)
-    test_loss = test(model_name, pre_path)
+    test_loss = test(model, opt, pre_path)
+
+    print("The epoch number of the best result:", best_epoch)
     evaluate(pre_path)
-    # print(test_loss)
+    print(test_loss)
 
 # tensorboard --logdir=resnet18_202307141720 --port=6007
 # tensorboard --logdir=add_normal_res_18 --port=6007
