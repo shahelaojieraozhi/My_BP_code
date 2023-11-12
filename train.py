@@ -139,7 +139,8 @@ def train(opt):
     # model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
 
     # model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
-    model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
+    # model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
+    model = msr_tf_bp_ppg_segment(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
     model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
@@ -208,7 +209,7 @@ if __name__ == '__main__':
     parser.add_argument("-se", "--start_epoch", type=int, default=1, help="start_epoch")
     parser.add_argument("-st", "--stage", type=int, default=1, help="stage")
     parser.add_argument("-ds", "--decay_step", type=list, default=[100], help="decay step list of learning rate")
-    parser.add_argument("-wd", "--weight_decay", type=int, default=2, help="weight_decay")
+    parser.add_argument("-wd", "--weight_decay", type=int, default=1e-3, help="weight_decay")
     parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
     parser.add_argument('--show_interval', type=int, default=50, help='how long to show the loss value')
     parser.add_argument('--loss_func', type=str, default='SmoothL1Loss', help='which loss function is selected')
