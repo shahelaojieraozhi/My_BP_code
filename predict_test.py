@@ -53,7 +53,7 @@ def inv_normalize(sbp_arr, dbp_arr):
 
 def test(model, opt, pre_path):
     print('loading data...')
-    test_data = PPG2BPDataset(opt.test_data_path)
+    test_data = PPG2BPDataset('test')
     test_loader = DataLoader(test_data, batch_size=opt.batch, num_workers=0)
     model.eval()
 
@@ -192,12 +192,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--batch", type=int, default=2048, help="batch size of training")
     # logs/11_9_add_wd/best_w.pth
-    parser.add_argument("-m", "--model_name", type=str, default='default_seed=888', help="model name")  # best
-    # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no', help="model to execute")
+    # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no_decay', help="model name")  # best
+    parser.add_argument("-m", "--model_name", type=str, default='cvprw_wd=1e-3_bs=64_SmoothL1Loss_2023111100', help="model to execute")
     parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
     parser.add_argument('--loss_func', type=str, default='SmoothL1Loss', help='which loss function is selected')
-    parser.add_argument("-tp", "--test_data_path", type=str,
-                        default='G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test', help="test data path")
+    # parser.add_argument("-tp", "--test_data_path", type=str,
+    #                     default='G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test', help="test data path")
     opt = parser.parse_args()
 
     input_channel = 3 if opt.using_derivative else 1

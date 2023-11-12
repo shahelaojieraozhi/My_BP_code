@@ -24,7 +24,8 @@ from torch.utils.data import DataLoader
 import utils
 from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset import PPG2BPDataset, use_derivative
-from model.bp_MSR_Net import MSResNet
+
+# from model.bp_MSR_Net import MSResNet
 
 # from model.bpnet_cvprw import resnet50
 # from model.resnet1d import resnet50
@@ -136,9 +137,9 @@ def train(opt):
     "load model"
     # model = resnet50(num_input_channels=1, num_classes=2)
     # model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
-    # model = resnet18()
-    # model = resnet50(input_c=3, num_classes=2)
-    model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
+
+    # model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
+    model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
     model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
@@ -147,10 +148,8 @@ def train(opt):
 
     """load data"""
     print('loading data...')
-    train_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\train"
-    val_data_path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\val"
-    train_data = PPG2BPDataset(train_data_path)
-    val_data = PPG2BPDataset(val_data_path)
+    train_data = PPG2BPDataset('train')
+    val_data = PPG2BPDataset('val')
 
     train_loader = DataLoader(train_data, batch_size=opt.batch, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_data, batch_size=opt.batch, shuffle=True, num_workers=0)
@@ -200,10 +199,10 @@ def train(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--model", type=str, default='res50', help="model type")
-    parser.add_argument("-d", "--describe", type=str, default='reproduce', help="describe for this model")
+    parser.add_argument("-t", "--model", type=str, default='res18', help="model type")
+    parser.add_argument("-d", "--describe", type=str, default='new', help="describe for this model")
     parser.add_argument("-n", "--n_epochs", type=int, default=60, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=256, help="batch size of training")
+    parser.add_argument("-b", "--batch", type=int, default=64, help="batch size of training")
     parser.add_argument("-bl", "--best_loss", type=int, default=1e3, help="best_loss")
     parser.add_argument("-lr", "--lr", type=int, default=1e-3, help="learning rate")
     parser.add_argument("-se", "--start_epoch", type=int, default=1, help="start_epoch")
