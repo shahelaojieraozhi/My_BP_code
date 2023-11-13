@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-@Project ：My_BP_code
+@Project ：My_BP_code 
 @Time    : 2023/10/22 12:22
 @Author  : Rao Zhi
-@File    : MSR_tranformer_bp.py
+@File    : MSR_tranformer_bp_v2.py
 @email   : raozhi@mails.cust.edu.cn
-@IDE     ：PyCharm
+@IDE     ：PyCharm 
 
 """
-import math
-
 import torch.nn as nn
 import torch
 
@@ -177,10 +175,10 @@ class msr_tf_bp(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool1d(H, w)   nn.AdaptiveAvgPool1d(1) 即为 (1, 1)
         自适应池化, 对输入信号，提供自适应平均池化操作 对于任何输入大小的输入，可以将输出尺寸指定为H*W， 但是输入和输出特征的数目不会变化。
         """
-        self.fc = nn.Linear(256 * 3, num_classes)
+        self.fc = nn.Linear(256 * 3 * 2, num_classes)
         self.sigmoid = nn.Sigmoid()
 
-        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=8)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=256 * 2, nhead=8)
         self.transformerEncoder = nn.TransformerEncoder(encoder_layer, num_layers=3)
 
         # todo: modify the initialization
@@ -252,31 +250,31 @@ class msr_tf_bp(nn.Module):
         x = self.layer3x3_1(x0)  # (1024, 64, 219)
         x = self.layer3x3_2(x)  # (1024, 128, 110)
         x = self.layer3x3_3(x)  # (1024, 256, 55)
-        # x = self.layer3x3_4(x)
+        x = self.layer3x3_4(x)  # (1024, 512, 28)
         # x = self.maxpool3(x)  # (1024, 256, 1)
-        x = self.avgpool(x)  # (1024, 256, 1)
+        x = self.avgpool(x)     # (1024, 256, 1)
 
         y = self.layer5x5_1(x0)  # (1024, 64, 215)
         y = self.layer5x5_2(y)  # (1024, 128, 105)
         y = self.layer5x5_3(y)  # (1024, 256, 50)
-        # y = self.layer5x5_4(y)
+        y = self.layer5x5_4(y)  # (1024, 512, 22)
         # y = self.maxpool5(y)  # (1024, 256, 1)
-        y = self.avgpool(y)  # (1024, 256, 1)
+        y = self.avgpool(y)     # (1024, 256, 1)
 
         z = self.layer7x7_1(x0)  # (1024, 64, 211)
-        z = self.layer7x7_2(z)  # (1024, 128, 100)
-        z = self.layer7x7_3(z)  # (1024, 256, 44)
-        # z = self.layer7x7_4(z)
+        z = self.layer7x7_2(z)   # (1024, 128, 100)
+        z = self.layer7x7_3(z)   # (1024, 256, 44)
+        z = self.layer7x7_4(z)   # (1024, 512, 16)
         # z = self.maxpool7(z)   # (1024, 256, 1)
-        z = self.avgpool(z)  # (1024, 256, 1)
+        z = self.avgpool(z)      # (1024, 256, 1)
 
-        out = torch.cat([x, y, z], dim=2)  # (1024, 256, 3)
-        out = torch.transpose(out, 0, 2)  # (3, 256, 1024)
-        out = torch.transpose(out, 1, 2)  # (3, 1024, 256)
+        out = torch.cat([x, y, z], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
+        out = torch.transpose(out, 0, 2)   # (3, 256, 1024)
+        out = torch.transpose(out, 1, 2)   # (3, 1024, 256)
 
         out = self.transformerEncoder(out)
-        out = torch.transpose(out, 0, 1)  # (1024, 3, 256)
-        out = out.reshape(out.size(0), -1)  # (batch_size, -1)
+        out = torch.transpose(out, 0, 1)   # (1024, 3, 256)
+        out = out.reshape(out.size(0), -1)   # (batch_size, -1)
 
         # out = torch.cat([x, y, z], dim=1)  # (1024, 768, 1)
         # out = torch.mean(out, dim=0)        # (5, 64)

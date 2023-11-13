@@ -29,7 +29,7 @@ from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 
 # from model.bpnet_cvprw import resnet50
 # from model.resnet1d import resnet50
-# from model.MSR_tranformer_bp import msr_tf_bp
+from model.MSR_tranformer_bp_v2 import msr_tf_bp
 # from model.MSR_tranformer_bp_ppg_segment import msr_tf_bp_ppg_segment
 # from model.resnet18_1D_segment import resnet18_1d
 
@@ -140,7 +140,7 @@ def train(opt):
 
     # model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
     # model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
-    model = msr_tf_bp_ppg_segment(input_channel=1, layers=[1, 1, 1, 1], num_classes=2)
+    model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
     model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
@@ -200,8 +200,8 @@ def train(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--model", type=str, default='res18', help="model type")
-    parser.add_argument("-d", "--describe", type=str, default='new', help="describe for this model")
+    parser.add_argument("-t", "--model", type=str, default='msr_tf_bp', help="model type")
+    parser.add_argument("-d", "--describe", type=str, default='3 channel', help="describe for this model")
     parser.add_argument("-n", "--n_epochs", type=int, default=60, help="number of epochs of training")
     parser.add_argument("-b", "--batch", type=int, default=64, help="batch size of training")
     parser.add_argument("-bl", "--best_loss", type=int, default=1e3, help="best_loss")
@@ -210,7 +210,7 @@ if __name__ == '__main__':
     parser.add_argument("-st", "--stage", type=int, default=1, help="stage")
     parser.add_argument("-ds", "--decay_step", type=list, default=[100], help="decay step list of learning rate")
     parser.add_argument("-wd", "--weight_decay", type=int, default=1e-3, help="weight_decay")
-    parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
+    parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--show_interval', type=int, default=50, help='how long to show the loss value')
     parser.add_argument('--loss_func', type=str, default='SmoothL1Loss', help='which loss function is selected')
     args = parser.parse_args()

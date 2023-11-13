@@ -97,4 +97,51 @@ import torch
 # a = 1 if input_channel == 1 else 3
 # print(a)
 
-print(datetime.datetime.now())
+# print(datetime.datetime.now())
+
+import h5py
+
+path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\val\\MIMIC_III_ppg_val_00001_of_00250.h5"
+
+# # 列索引，这里假设你想要处理第二列（索引为1）
+sbp_index = 0
+dbp_index = 1
+
+# # 定义正常值的范围
+lower_sbp_bound = 75
+upper_sbp_bound = 165
+
+lower_dbp_bound = 40
+upper_dbp_bound = 80
+
+with h5py.File(path, 'r') as f:
+    ppg = np.array(f.get('/ppg')[:].astype(np.float32))
+    bp = np.array(f.get('/label')[:].astype(np.float32))
+
+# Use condition index(条件索引)
+filter_sbp = bp[(bp[:, sbp_index] >= lower_sbp_bound) & (bp[:, sbp_index] <= upper_sbp_bound)]                  # 952   # Separate filtering
+filter_dbp = filter_sbp[(filter_sbp[:, dbp_index] >= lower_dbp_bound) & (filter_sbp[:, dbp_index] <= upper_dbp_bound)]    # 881
+
+filter_sbp_ppg = ppg[(bp[:, sbp_index] >= lower_sbp_bound) & (bp[:, sbp_index] <= upper_sbp_bound)]             # 952  Separate filtering
+filter_dbp_ppg = filter_sbp_ppg[(filter_sbp[:, dbp_index] >= lower_dbp_bound) & (filter_sbp[:, dbp_index] <= upper_dbp_bound)]  # 881
+print()
+
+# # 创建一个示例数组
+# data = np.array([[1, 80, 3],
+#                  [2, 90, 5],
+#                  [3, 120, 2],
+#                  [4, 200, 8],
+#                  [5, 150, 6]])
+#
+# # 列索引，这里假设你想要处理第二列（索引为1）
+# column_index = 1
+#
+# # 定义正常值的范围
+# lower_bound = 75
+# upper_bound = 165
+#
+# # 使用条件索引来剔除异常值
+# filtered_data = data[(data[:, column_index] >= lower_bound) & (data[:, column_index] <= upper_bound)]
+#
+# print("原始数据:\n", data)
+# print("\n剔除异常值后的数据:\n", filtered_data)

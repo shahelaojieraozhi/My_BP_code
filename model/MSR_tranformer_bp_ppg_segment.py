@@ -3,7 +3,7 @@
 @Project ：My_BP_code 
 @Time    : 2023/10/22 12:22
 @Author  : Rao Zhi
-@File    : MSR_tranformer_bp.py
+@File    : MSR_tranformer_bp_v2.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 

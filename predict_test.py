@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader
 from model.resnet18_1D import resnet18_1d
 # from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
 from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
+from model.MSR_tranformer_bp import msr_tf_bp
 
 from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 # from model.bpnet_cvprw import resnet50
@@ -194,8 +195,8 @@ if __name__ == '__main__':
     parser.add_argument("-b", "--batch", type=int, default=4096, help="batch size of training")
     # logs/11_9_add_wd/best_w.pth
     # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no_decay', help="model name")  # best
-    parser.add_argument("-m", "--model_name", type=str, default='res18_bs=1024_SmoothL1Loss_2023111200', help="model to execute")
-    parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
+    parser.add_argument("-m", "--model_name", type=str, default='msr_tf_bp_3 channel_2023111302', help="model to execute")
+    parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--loss_func', type=str, default='SmoothL1Loss', help='which loss function is selected')
     # parser.add_argument("-tp", "--test_data_path", type=str,
     #                     default='G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test', help="test data path")
@@ -209,8 +210,10 @@ if __name__ == '__main__':
     # model = resnet50(num_input_channels=1, num_classes=2)
     # model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
     # model = resnet18()
-    model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
+    model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
     model = model.to(device)
+    # model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
+    # model = model.to(device)
 
     "load model"
     model.load_state_dict(torch.load('logs/' + opt.model_name + '/best_w.pth')['state_dict'])
