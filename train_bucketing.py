@@ -23,7 +23,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
 from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
-from PPG2BP_Dataset import PPG2BPDataset, use_derivative
+from PPG2BP_Dataset_bucketing import PPG2BPDataset, use_derivative
 
 # from model.bp_MSR_Net import MSResNet
 
@@ -38,14 +38,22 @@ warnings.filterwarnings("ignore")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def loss_calculate(pre, label, loss_name='mse'):
+def BucketingLoss(pre, label, class_label_hat):
+    loss_value = F.mse_loss(pre, label)
+    logit = F.softmax(class_label_hat)
+    loss = loss_value * logit
+    return loss
+
+
+def loss_calculate(pre, label, class_label, class_label_hat, loss_name='mse'):
     if loss_name == 'mse':
         return F.mse_loss(pre, label)
     elif loss_name == 'SmoothL1Loss':
         smooth_l1_loss = torch.nn.SmoothL1Loss()
         return smooth_l1_loss(pre, label)
     elif loss_name == 'bp_bucketing_loss':
-        pass
+        bp_bucketing_loss = BucketingLoss(pre, label, class_label_hat)
+        return bp_bucketing_loss
 
 
 def seed_torch(seed=666):
@@ -73,15 +81,19 @@ def train_epoch(model, optimizer, train_dataloader, opt):
     model.train()
 
     loss_meter, loss_sbp_meter, loss_dbp_meter, it_count = 0, 0, 0, 0
-    for (ppg, sbp, dbp) in train_dataloader:
+    for (ppg, sbp, dbp, sbp_class, dbp_class) in train_dataloader:
         ppg = ppg.to(device)
         ppg = use_derivative(ppg) if opt.using_derivative else ppg
         bp_hat = model(ppg).cpu()
         sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+        sbp_class_hat, dbp_class_hat = bp_hat[:, 2:12], bp_hat[:, 12:]
         optimizer.zero_grad()
 
-        loss_sbp = loss_calculate(sbp_hat, sbp, opt.loss_func)
-        loss_dbp = loss_calculate(dbp_hat, dbp, opt.loss_func)
+        # loss_sbp = loss_calculate(sbp_hat, sbp, opt.loss_func)
+        # loss_dbp = loss_calculate(dbp_hat, dbp, opt.loss_func)
+
+        loss_sbp = loss_calculate(sbp, sbp_hat, sbp_class, sbp_class_hat, opt.loss_func)
+        loss_dbp = loss_calculate(dbp, dbp_hat, dbp_class, dbp_class_hat, opt.loss_func)
         # loss_sbp = loss_function(sbp_hat, bp[:, 0])
         # loss_dbp = loss_function(dbp_hat, bp[:, 1])
 
@@ -143,7 +155,7 @@ def train(opt):
 
     # model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
     # model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
-    model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
+    model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=17)
     model = model.to(device)
 
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'
@@ -215,7 +227,7 @@ if __name__ == '__main__':
     parser.add_argument("-wd", "--weight_decay", type=int, default=1e-3, help="weight_decay")
     parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--show_interval', type=int, default=50, help='how long to show the loss value')
-    parser.add_argument('--loss_func', type=str, default='SmoothL1Loss', help='which loss function is selected')
+    parser.add_argument('--loss_func', type=str, default='bp_bucketing_loss', help='which loss function is selected')
     args = parser.parse_args()
     print(f'args: {vars(args)}')
     train(args)

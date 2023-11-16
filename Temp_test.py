@@ -99,32 +99,32 @@ import torch
 
 # print(datetime.datetime.now())
 
-import h5py
-
-path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\val\\MIMIC_III_ppg_val_00001_of_00250.h5"
-
-# # 列索引，这里假设你想要处理第二列（索引为1）
-sbp_index = 0
-dbp_index = 1
-
-# # 定义正常值的范围
-lower_sbp_bound = 75
-upper_sbp_bound = 165
-
-lower_dbp_bound = 40
-upper_dbp_bound = 80
-
-with h5py.File(path, 'r') as f:
-    ppg = np.array(f.get('/ppg')[:].astype(np.float32))
-    bp = np.array(f.get('/label')[:].astype(np.float32))
-
-# Use condition index(条件索引)
-filter_sbp = bp[(bp[:, sbp_index] >= lower_sbp_bound) & (bp[:, sbp_index] <= upper_sbp_bound)]                  # 952   # Separate filtering
-filter_dbp = filter_sbp[(filter_sbp[:, dbp_index] >= lower_dbp_bound) & (filter_sbp[:, dbp_index] <= upper_dbp_bound)]    # 881
-
-filter_sbp_ppg = ppg[(bp[:, sbp_index] >= lower_sbp_bound) & (bp[:, sbp_index] <= upper_sbp_bound)]             # 952  Separate filtering
-filter_dbp_ppg = filter_sbp_ppg[(filter_sbp[:, dbp_index] >= lower_dbp_bound) & (filter_sbp[:, dbp_index] <= upper_dbp_bound)]  # 881
-print()
+# import h5py
+#
+# path = "G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\val\\MIMIC_III_ppg_val_00001_of_00250.h5"
+#
+# # # 列索引，这里假设你想要处理第二列（索引为1）
+# sbp_index = 0
+# dbp_index = 1
+#
+# # # 定义正常值的范围
+# lower_sbp_bound = 75
+# upper_sbp_bound = 165
+#
+# lower_dbp_bound = 40
+# upper_dbp_bound = 80
+#
+# with h5py.File(path, 'r') as f:
+#     ppg = np.array(f.get('/ppg')[:].astype(np.float32))
+#     bp = np.array(f.get('/label')[:].astype(np.float32))
+#
+# # Use condition index(条件索引)
+# filter_sbp = bp[(bp[:, sbp_index] >= lower_sbp_bound) & (bp[:, sbp_index] <= upper_sbp_bound)]                  # 952   # Separate filtering
+# filter_dbp = filter_sbp[(filter_sbp[:, dbp_index] >= lower_dbp_bound) & (filter_sbp[:, dbp_index] <= upper_dbp_bound)]    # 881
+#
+# filter_sbp_ppg = ppg[(bp[:, sbp_index] >= lower_sbp_bound) & (bp[:, sbp_index] <= upper_sbp_bound)]             # 952  Separate filtering
+# filter_dbp_ppg = filter_sbp_ppg[(filter_sbp[:, dbp_index] >= lower_dbp_bound) & (filter_sbp[:, dbp_index] <= upper_dbp_bound)]  # 881
+# print()
 
 # # 创建一个示例数组
 # data = np.array([[1, 80, 3],
@@ -145,3 +145,22 @@ print()
 #
 # print("原始数据:\n", data)
 # print("\n剔除异常值后的数据:\n", filtered_data)
+
+
+# a = [x for x in range(80, 160, 10)]
+
+
+# # 创建一个示例的 NumPy 数组
+# A = np.array([102, 81, 98])
+#
+# # 计算标记的值
+# labels = ((A - 80) // 10).astype(int)
+#
+# # 打印结果
+# print(labels)
+# print(labels[1])
+
+# bp_hat = torch.rand(1, 17)
+# sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+# sbp_label_hat, dbp_label_hat = bp_hat[:, 2:12], bp_hat[:, 12:]
+# print()

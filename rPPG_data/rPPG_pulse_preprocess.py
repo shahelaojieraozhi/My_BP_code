@@ -12,8 +12,8 @@ import os
 import numpy as np
 import h5py
 
-pulse_path = r'G:\Blood_Pressure_dataset\ours\subject_1\rPPG_pulse'
-bp_path = r'G:\Blood_Pressure_dataset\ours\subject_1\subject_bp.csv'
+pulse_path = r'G:\Blood_Pressure_dataset\ours\subject-1\rPPG_pulse'
+bp_path = r'G:\Blood_Pressure_dataset\ours\subject-1\subject_bp.csv'
 save_path = 'rPPG_bp_subject.h5'
 
 # bp value modify
@@ -32,7 +32,9 @@ subject_id = np.ones(bp_numbers * 2)
 writer = h5py.File(save_path, 'w')
 
 # get all signals
-for each_section in os.listdir(pulse_path):
+order_pulse_list = os.listdir(pulse_path)
+order_pulse_list.sort(key=lambda x: int(x.split('.')[0].split('_')[-1]))
+for each_section in order_pulse_list:
     whole_signal = np.loadtxt(os.path.join(pulse_path, each_section), delimiter=',')
     container.append(whole_signal)
 

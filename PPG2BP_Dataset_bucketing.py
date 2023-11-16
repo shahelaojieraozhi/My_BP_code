@@ -51,7 +51,10 @@ class PPG2BPDataset(Dataset):
         # self.sbp = (self.BP[:, 0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
         # self.dbp = (self.BP[:, 1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
         self.sbp = self.BP[:, 0]
+        self.sbp_labels = ((self.sbp - 75) // 10)   # between 0 and 8
+        # a = ((self.sbp - 75) // 10)[:100]
         self.dbp = self.BP[:, 1]
+        self.dbp_labels = ((self.dbp - 40) // 10)   # between 0 ~ 4
 
     def __getitem__(self, index):
         ppg = self.ppg[index, :]
@@ -62,10 +65,12 @@ class PPG2BPDataset(Dataset):
         sbp = self.sbp[index]
         dbp = self.dbp[index]
 
+        sbp_label = self.sbp_labels[index]
+        dbp_label = self.dbp_labels[index]
         # sbp = (bp[0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
         # dbp = (bp[1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
 
-        return ppg, sbp, dbp
+        return ppg, sbp, dbp, sbp_label, dbp_label
 
     def __len__(self):
         # return len(self.h5_path_list) * 1000
