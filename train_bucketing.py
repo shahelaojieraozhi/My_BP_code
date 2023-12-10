@@ -38,10 +38,13 @@ warnings.filterwarnings("ignore")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def BucketingLoss(pre, label, class_label_hat):
-    loss_value = F.mse_loss(pre, label)
+def BucketingLoss(pre, label, class_label, class_label_hat):
+    # loss_value = F.mse_loss(pre, label)
+    # logit = F.softmax(class_label_hat)
+    # loss = loss_value * logit
+
     logit = F.softmax(class_label_hat)
-    loss = loss_value * logit
+    loss = class_label * logit
     return loss
 
 
@@ -52,7 +55,7 @@ def loss_calculate(pre, label, class_label, class_label_hat, loss_name='mse'):
         smooth_l1_loss = torch.nn.SmoothL1Loss()
         return smooth_l1_loss(pre, label)
     elif loss_name == 'bp_bucketing_loss':
-        bp_bucketing_loss = BucketingLoss(pre, label, class_label_hat)
+        bp_bucketing_loss = BucketingLoss(pre, label, class_label, class_label_hat)
         return bp_bucketing_loss
 
 
@@ -227,7 +230,9 @@ if __name__ == '__main__':
     parser.add_argument("-wd", "--weight_decay", type=int, default=1e-3, help="weight_decay")
     parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--show_interval', type=int, default=50, help='how long to show the loss value')
-    parser.add_argument('--loss_func', type=str, default='bp_bucketing_loss', help='which loss function is selected')
+    parser.add_argument('--loss_func', type=str, default='bp_bucketing_loss',
+                        choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss'),
+                        help='which loss function is selected')
     args = parser.parse_args()
     print(f'args: {vars(args)}')
     train(args)

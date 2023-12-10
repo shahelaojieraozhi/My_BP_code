@@ -57,7 +57,7 @@ def plot_coordinates(gt_bp, pre_bp):
 if __name__ == '__main__':
     """ This is my train result """
     # test_path = '../predict_test/msr_tf_bp_normal_bp_2023111308/'
-    test_path = '../predict_test/cvprw_reproduce_new_data/'  # cvprw result
+    test_path = '../predict_test/normal_bp_msr_tf_bp_bs=16384_HuberLoss_no-fixed_lr_2023111706/'  # cvprw result
     bps = []
     columns = ['sbp_hat_arr', 'dbp_hat_arr', 'sbp_arr', 'dbp_arr']
     for sec in os.listdir(test_path):
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         print()
         print("SBP section is {} ~ {}".format(threshold, threshold + 10))
         print("SBP section number is {}".format(len(sbp_arr)))
-        print("SBP Standard Deviation (SD):", sbp_sd)
+        # print("SBP Standard Deviation (SD):", sbp_sd)
         print("SBP Mean Absolute Error (MAE):", sbp_mae)
         # print("SBP Correlation Coefficient (r-value):", sbp_r_value)
         # print()
@@ -97,7 +97,7 @@ if __name__ == '__main__':
         print()
         print("DBP section is {} ~ {}".format(threshold, threshold + 10))
         print("DBP section number is {}".format(len(dbp_arr)))
-        print("DBP Standard Deviation (SD):", dbp_sd)
+        # print("DBP Standard Deviation (SD):", dbp_sd)
         print("DBP Mean Absolute Error (MAE):", dbp_mae)
         # print("DBP Correlation Coefficient (r-value):", dbp_r_value)
         # print()

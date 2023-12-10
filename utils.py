@@ -16,11 +16,6 @@ from sklearn.metrics import f1_score
 from torch import nn
 
 
-def mkdirs(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-
 # 计算F1score
 def calc_f1(y_true, y_pre, threshold=0.5):
     y_true = y_true.view(-1).cpu().detach().numpy().astype(np.int)
@@ -31,6 +26,11 @@ def calc_f1(y_true, y_pre, threshold=0.5):
 # 打印时间
 def print_time_cost(since):
     time_elapsed = time.time() - since
+    return '{:.0f}m{:.0f}s\n'.format(time_elapsed // 60, time_elapsed % 60)
+
+
+def left_time(since, done_epoch):
+    time_elapsed = (time.time() - since) * done_epoch
     return '{:.0f}m{:.0f}s\n'.format(time_elapsed // 60, time_elapsed % 60)
 
 
@@ -68,3 +68,12 @@ def seed_torch(seed=1029):
 
 
 seed_torch()
+
+
+def weights_init_normal(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm2d') != -1:
+        torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
+        torch.nn.init.constant_(m.bias.data, 0.0)

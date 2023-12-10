@@ -39,6 +39,9 @@ def loss_calculate(pre, label, loss_name='mse'):
     elif loss_name == "SmoothL1Loss":
         smooth_l1_loss = torch.nn.SmoothL1Loss()
         return smooth_l1_loss(pre, label)
+    elif loss_name == "HuberLoss":
+        HuberLoss = torch.nn.HuberLoss(delta=1)
+        return HuberLoss(pre, label)
 
 
 def inv_normalize(sbp_arr, dbp_arr):
@@ -195,9 +198,15 @@ if __name__ == '__main__':
     # logs/11_9_add_wd/best_w.pth
     # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no_decay', help="model name")  # best
     # parser.add_argument("-m", "--model_name", type=str, default='msr_tf_bp_normal_bp_2023111308', help="model to execute")
-    parser.add_argument("-m", "--model_name", type=str, default='cvprw_reproduce_new_data', help="model to execute")    # vs cvprw
+    parser.add_argument("-mn", "--model_name", type=str,
+                        default='normal_bp_msr_tf_bp_bs=16384_HuberLoss_no-fixed_lr_2023111706',
+                        help="model to execute")  # vs cvprw
+    parser.add_argument("-m", "--model", type=str, default='msr_tf_bp', choices=('msr_tf_bp', 'cvprw'),
+                        help="model to execute")  # vs cvprw
     parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
-    parser.add_argument('--loss_func', type=str, default='SmoothL1Loss', help='which loss function is selected')
+    parser.add_argument('--loss_func', type=str, default='HuberLoss',
+                        choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss', 'HuberLoss'),
+                        help='which loss function is selected')
     # parser.add_argument("-tp", "--test_data_path", type=str,
     #                     default='G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test', help="test data path")
     opt = parser.parse_args()
@@ -213,9 +222,12 @@ if __name__ == '__main__':
     # model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
     # model = model.to(device)
 
-    model = resnet50(input_c=input_channel, num_classes=2)   # cvprw
-
-    # model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)    # ours
+    if opt.model == 'cvprw':
+        model = resnet50(input_c=input_channel, num_classes=2)  # cvprw
+    elif opt.model == 'msr_tf_bp':
+        model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)  # ours
+    else:
+        pass
     model = model.to(device)
 
     "load model"
