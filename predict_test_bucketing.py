@@ -17,9 +17,9 @@ from torch.utils.data import DataLoader
 from model.resnet18_1D import resnet18_1d
 # from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
 from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
-from model.MSR_tranformer_bp import msr_tf_bp
+from model.MSR_tranformer_bp_v2 import msr_tf_bp
 
-from PPG2BP_Dataset import PPG2BPDataset, use_derivative
+from PPG2BP_Dataset_bucketing import PPG2BPDataset, use_derivative
 from model.bpnet_cvprw import resnet50
 import os
 from scipy.stats import pearsonr
@@ -63,12 +63,12 @@ def test(model, opt, pre_path):
     loss_meter, it_count = 0, 0
     test_batch_idx = 0
     with torch.no_grad():
-        for (ppg, sbp, dbp) in test_loader:
-            ppg = use_derivative(ppg) if opt.using_derivative else ppg
+        for (ppg, sbp, dbp, sbp_class, dbp_class) in test_loader:
             ppg = ppg.to(device)
+            ppg = use_derivative(ppg) if opt.using_derivative else ppg
             bp_hat = model(ppg).cpu()
             sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
-            # dbp_hat, sbp_hat = bp_hat[:, 0], bp_hat[:, 1]  # error
+            # sbp_class_hat, dbp_class_hat = bp_hat[:, 2:12], bp_hat[:, 12:]
 
             sbp_hat_arr = sbp_hat.numpy()
             dbp_hat_arr = dbp_hat.numpy()
@@ -178,21 +178,21 @@ def evaluate(test_path):
     # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
     # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
 
-    # print("SBP Mean Absolute Error (MAE):", sbp_mae)
-    # print("DBP Mean Absolute Error (MAE):", dbp_mae)
-
-    print()
-    print("SBP Standard Deviation (SD):", sbp_sd)
     print("SBP Mean Absolute Error (MAE):", sbp_mae)
-    print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
-    print("SBP Correlation Coefficient (r-value):", sbp_r_value)
-    print()
-
-    print("DBP Standard Deviation (SD):", dbp_sd)
     print("DBP Mean Absolute Error (MAE):", dbp_mae)
-    print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
-    print("DBP Correlation Coefficient (r-value):", dbp_r_value)
-    print()
+
+    # print()
+    # print("SBP Standard Deviation (SD):", sbp_sd)
+    # print("SBP Mean Absolute Error (MAE):", sbp_mae)
+    # print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
+    # print("SBP Correlation Coefficient (r-value):", sbp_r_value)
+    # print()
+    #
+    # print("DBP Standard Deviation (SD):", dbp_sd)
+    # print("DBP Mean Absolute Error (MAE):", dbp_mae)
+    # print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
+    # print("DBP Correlation Coefficient (r-value):", dbp_r_value)
+    # print()
 
 
 if __name__ == '__main__':
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no_decay', help="model name")  # best
     # parser.add_argument("-m", "--model_name", type=str, default='msr_tf_bp_normal_bp_2023111308', help="model to execute")
     parser.add_argument("-mn", "--model_name", type=str,
-                        default='msr_tf_bp_bs=4096_normal_bp_mse_no_fixed_lr_2023111612',
+                        default='msr_tf_bp_0.6sl + 0.4bl_multi_task_v3_2023121303',
                         help="model to execute")  # vs cvprw
     parser.add_argument("-m", "--model", type=str, default='msr_tf_bp', choices=('msr_tf_bp', 'cvprw'),
                         help="model to execute")  # vs cvprw
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     if opt.model == 'cvprw':
         model = resnet50(input_c=input_channel, num_classes=2)  # cvprw
     elif opt.model == 'msr_tf_bp':
-        model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)  # ours
+        model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=17)  # ours
     else:
         pass
     model = model.to(device)
@@ -240,9 +240,11 @@ if __name__ == '__main__':
     os.makedirs(pre_path, exist_ok=True)
     test_loss = test(model, opt, pre_path)
 
+    print("The epoch number of the best result:", best_epoch)
+
     print()
     # print model name
-    describe = ""
+    describe = "0.6 smooth_l1_loss + 0.4 bucket_loss"
     print(opt.model_name)
     print(describe)
 

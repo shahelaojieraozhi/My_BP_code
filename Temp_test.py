@@ -164,3 +164,104 @@ import torch
 # sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
 # sbp_label_hat, dbp_label_hat = bp_hat[:, 2:12], bp_hat[:, 12:]
 # print()
+
+
+# import torch
+#
+# # 一个假设的场景
+# predictions = torch.randn((3, 4))  # 假设有3个样本，每个样本有4个预测
+# targets = torch.randn((3, 2))  # 每个样本有2个回归目标
+# class_labels = torch.randint(0, 4, (3,))  # 4个类别
+#
+# # 获取预测的类别
+# predicted_classes = torch.argmax(predictions, dim=1)
+#
+# # 提取每个类别对应的回归目标
+# a = predicted_classes.view(-1, 1)
+# reg_targets_per_class = torch.gather(targets, 1, predicted_classes.view(-1, 1))
+
+# import torch
+#
+# tensor_0 = torch.arange(3, 12).view(3, 3)
+# print(tensor_0)
+# index = torch.tensor([[2, 1, 0]])
+# tensor_1 = tensor_0.gather(0, index)
+# print(tensor_1)
+
+
+# import torch
+# import torch.nn.functional as F
+#
+#
+# def decomposed_loss(predictions, targets, class_num):
+#     """
+#     将回归任务分解为分类任务和区间内回归任务的损失函数
+#
+#     参数：
+#     - predictions: 模型的预测结果，一个包含分类分数和回归值的张量
+#     - targets: 真实标签，包含分类标签和回归目标
+#     - boundaries: 区间的边界列表
+#
+#     返回：
+#     - 总体损失
+#     """
+#     # 分离分类标签和回归目标
+#     class_targets, reg_targets = targets[:, 0].long(), targets[:, 1:].squeeze()
+#
+#     # 计算分类任务的损失（使用交叉熵损失）
+#     classification_loss = F.cross_entropy(predictions[:, :class_num], class_targets)
+#
+#     # 获取预测的类别
+#     a = F.softmax(predictions[:, :class_num])
+#     # predicted_classes = torch.argmax(predictions[:, :len(boundaries)], dim=1)
+#
+#     # 计算区间内回归任务的损失（使用均方误差）
+#     # a = predictions[:, -1]
+#     # b = reg_targets
+#
+#     regression_loss = F.mse_loss(predictions[:, -1], reg_targets)
+#
+#     # 求和得到总体损失
+#     total_loss = (classification_loss + regression_loss).mean()
+#
+#     return total_loss
+#
+#
+# batch_size = 128
+# # 示例用法
+#
+# # 假设有3个区间，每个区间对应一个类别
+# num_classes = 3
+#
+#
+# # 模型的预测结果，包括分类分数和回归值
+# predictions = torch.randn((batch_size, num_classes + 1))
+#
+# # 真实标签，包括分类标签和回归目标
+# # targets = torch.randn((batch_size, num_classes + 1))
+# reg_targets = torch.randn((batch_size, 1))
+# class_label = torch.randint(0, 3, (batch_size, 1))
+# targets = torch.cat((class_label, reg_targets), dim=1)
+#
+# # 计算总体损失
+# loss = decomposed_loss(predictions, targets, num_classes)
+# print(loss.item())
+#
+# input = torch.randn(3, 5)
+# target = torch.randint(5, (3,), dtype=torch.int64)
+# loss = F.cross_entropy(input, target)
+# print()
+
+
+# import torch
+#
+# # 创建两个矩阵
+# matrix1 = torch.tensor([[1, 2], [3, 4]])
+# matrix2 = torch.tensor([[5, 6], [7, 8]])
+#
+# # 使用 torch.matmul 进行矩阵乘法
+# result = torch.matmul(matrix2, matrix1)
+#
+# print("矩阵乘法的结果:")
+# print(result)
+

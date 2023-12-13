@@ -22,6 +22,7 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
+import torch.nn as nn
 from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset_bucketing import PPG2BPDataset, use_derivative
 
@@ -38,27 +39,6 @@ warnings.filterwarnings("ignore")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def BucketingLoss(pre, label, class_label, class_label_hat):
-    # loss_value = F.mse_loss(pre, label)
-    # logit = F.softmax(class_label_hat)
-    # loss = loss_value * logit
-
-    logit = F.softmax(class_label_hat)
-    loss = class_label * logit
-    return loss
-
-
-def loss_calculate(pre, label, class_label, class_label_hat, loss_name='mse'):
-    if loss_name == 'mse':
-        return F.mse_loss(pre, label)
-    elif loss_name == 'SmoothL1Loss':
-        smooth_l1_loss = torch.nn.SmoothL1Loss()
-        return smooth_l1_loss(pre, label)
-    elif loss_name == 'bp_bucketing_loss':
-        bp_bucketing_loss = BucketingLoss(pre, label, class_label, class_label_hat)
-        return bp_bucketing_loss
-
-
 def seed_torch(seed=666):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)  # To prohibit hash randomization and make the experiment replicable
@@ -73,6 +53,93 @@ def seed_torch(seed=666):
 seed_torch()
 
 
+def multi_task_loss_v3(reg_prediction, reg_target, class_prediction, class_target, which_bp):
+
+    """测试了，无效！！！"""
+    # reg_loss_func = torch.nn.SmoothL1Loss()
+    # smooth_l1_loss = reg_loss_func(reg_prediction, reg_target)
+
+    if which_bp == 'sbp':
+        # sbp
+        value = torch.Tensor([75, 85, 95, 105, 115, 125, 135, 145, 155, 165])
+        pro = F.softmax(class_prediction)
+        pre_final = torch.matmul(pro, value)
+        bucket_loss = F.mse_loss(pre_final, reg_target)
+    else:
+        # dbp
+        value = torch.Tensor([40, 50, 60, 70, 80])
+        pro = F.softmax(class_prediction)
+        pre_final = torch.matmul(pro, value)
+        bucket_loss = F.mse_loss(pre_final, reg_target)
+
+    return bucket_loss
+
+
+def multi_task_loss(reg_prediction, reg_target, class_prediction, class_target, which_bp):
+    # class_targets, reg_targets = targets[:, 0].long(), targets[:, 1:].squeeze()
+
+    classification_loss = F.cross_entropy(class_prediction, class_target)
+
+    # predicted_classes = torch.argmax(predictions[:, :len(boundaries)], dim=1)
+
+    # a = predictions[:, -1]
+    # b = reg_targets
+
+    # if torch.unique(class_target).numel() > 6:
+    if which_bp == 'sbp':
+        # sbp
+        regression_loss = F.mse_loss(reg_prediction, reg_target) / (len(reg_target) * (165 - 75))
+    else:
+        # dbp
+        regression_loss = F.mse_loss(reg_prediction, reg_target) / (len(reg_target) * (80 - 40))
+
+    total_loss = classification_loss + regression_loss
+
+    return total_loss
+
+
+def multi_task_loss_v2(reg_prediction, reg_target, class_prediction, class_target, which_bp):
+    reg_loss_func = torch.nn.SmoothL1Loss()
+    smooth_l1_loss = reg_loss_func(reg_prediction, reg_target)
+
+    if which_bp == 'sbp':
+        # sbp
+        value = torch.Tensor([75, 85, 95, 105, 115, 125, 135, 145, 155, 165])
+        pro = F.softmax(class_prediction)
+        pre_final = torch.matmul(pro, value)
+        bucket_loss = F.mse_loss(pre_final, reg_target)
+    else:
+        # dbp
+        value = torch.Tensor([40, 50, 60, 70, 80])
+        pro = F.softmax(class_prediction)
+        pre_final = torch.matmul(pro, value)
+        bucket_loss = F.mse_loss(pre_final, reg_target)
+
+    return smooth_l1_loss + bucket_loss
+
+
+def loss_calculate(pre, label, class_label_hat, class_label, loss_name='mse', which='sbp'):
+    if loss_name == 'mae':
+        mae_loss = nn.L1Loss()
+        return mae_loss(pre, label)
+
+    elif loss_name == 'mse':
+        mse_loss = nn.MSELoss()
+        return mse_loss(pre, label)
+
+    elif loss_name == 'SmoothL1Loss':
+        smooth_l1_loss = torch.nn.SmoothL1Loss()
+        return smooth_l1_loss(pre, label)
+
+    elif loss_name == 'multi_task_loss':
+        # return multi_task_loss(pre, label, class_label_hat, class_label, which)
+        return multi_task_loss_v2(pre, label, class_label_hat, class_label, which)
+
+    # elif loss_name == 'bp_bucketing_loss':
+    #     bp_bucketing_loss = BucketingLoss(pre, label, class_label, class_label_hat)
+    #     return bp_bucketing_loss
+
+
 def save_ckpt(state, is_best, model_save_dir):
     current_w = os.path.join(model_save_dir, 'current_w.pth')
     best_w = os.path.join(model_save_dir, 'best_w.pth')
@@ -83,7 +150,7 @@ def save_ckpt(state, is_best, model_save_dir):
 def train_epoch(model, optimizer, train_dataloader, opt):
     model.train()
 
-    loss_meter, loss_sbp_meter, loss_dbp_meter, it_count = 0, 0, 0, 0
+    mae_loss, loss_meter, loss_sbp_meter, loss_dbp_meter, it_count = 0, 0, 0, 0, 0
     for (ppg, sbp, dbp, sbp_class, dbp_class) in train_dataloader:
         ppg = ppg.to(device)
         ppg = use_derivative(ppg) if opt.using_derivative else ppg
@@ -92,11 +159,11 @@ def train_epoch(model, optimizer, train_dataloader, opt):
         sbp_class_hat, dbp_class_hat = bp_hat[:, 2:12], bp_hat[:, 12:]
         optimizer.zero_grad()
 
-        # loss_sbp = loss_calculate(sbp_hat, sbp, opt.loss_func)
-        # loss_dbp = loss_calculate(dbp_hat, dbp, opt.loss_func)
+        mae_loss_sbp = F.l1_loss(sbp_hat, sbp)
+        mae_loss_dbp = F.l1_loss(dbp_hat, dbp)
 
-        loss_sbp = loss_calculate(sbp, sbp_hat, sbp_class, sbp_class_hat, opt.loss_func)
-        loss_dbp = loss_calculate(dbp, dbp_hat, dbp_class, dbp_class_hat, opt.loss_func)
+        loss_sbp = loss_calculate(sbp_hat, sbp, sbp_class_hat, sbp_class, opt.loss_func, 'sbp')
+        loss_dbp = loss_calculate(dbp_hat, dbp, dbp_class_hat, dbp_class, opt.loss_func, 'dbp')
         # loss_sbp = loss_function(sbp_hat, bp[:, 0])
         # loss_dbp = loss_function(dbp_hat, bp[:, 1])
 
@@ -107,39 +174,42 @@ def train_epoch(model, optimizer, train_dataloader, opt):
         loss.backward()
         optimizer.step()
         loss_meter += loss.item()
+        mae_loss += (mae_loss_sbp + mae_loss_dbp).item()
 
         it_count += 1
         if it_count != 0 and it_count % opt.show_interval == 0:
-            print("%d, loss: %.3e" % (it_count, loss.item()))
+            print("%d, loss: %.3e, MAE loss: %.3e" % (it_count, loss.item(), (mae_loss_sbp + mae_loss_dbp).item()))
             # print("%d, whole loss: %.3e, sbp loss: %.3e, dbp loss: %.3e" % (
             #     it_count, loss.item(), loss_sbp.item(), loss_dbp.item()))
 
-    return loss_meter / it_count, loss_sbp_meter / it_count, loss_dbp_meter / it_count
+    return loss_meter / it_count, loss_sbp_meter / it_count, loss_dbp_meter / it_count, mae_loss / it_count
 
 
 def val_epoch(model, val_dataloader, opt):
     model.eval()
-    loss_meter, loss_sbp_meter, loss_dbp_meter, it_count = 0, 0, 0, 0
-    with torch.no_grad():
-        for (ppg, sbp, dbp) in val_dataloader:
-            ppg = ppg.to(device)
-            # ppg = ppg.unsqueeze(dim=0)
-            # ppg = torch.transpose(ppg, 1, 0)
-            ppg = use_derivative(ppg) if opt.using_derivative else ppg
-            bp_hat = model(ppg).cpu()
-            sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+    mae_loss, loss_meter, loss_sbp_meter, loss_dbp_meter, it_count = 0, 0, 0, 0, 0
+    for (ppg, sbp, dbp, sbp_class, dbp_class) in val_dataloader:
+        ppg = ppg.to(device)
+        ppg = use_derivative(ppg) if opt.using_derivative else ppg
+        bp_hat = model(ppg).cpu()
+        sbp_hat, dbp_hat = bp_hat[:, 0], bp_hat[:, 1]
+        sbp_class_hat, dbp_class_hat = bp_hat[:, 2:12], bp_hat[:, 12:]
 
-            loss_sbp = loss_calculate(sbp_hat, sbp, opt.loss_func)
-            loss_dbp = loss_calculate(dbp_hat, dbp, opt.loss_func)
+        mae_loss_sbp = F.l1_loss(sbp_hat, sbp)
+        mae_loss_dbp = F.l1_loss(dbp_hat, dbp)
 
-            loss = loss_dbp + loss_sbp
-            loss_meter += loss.item()
-            loss_sbp_meter += loss_sbp.item()
-            loss_dbp_meter += loss_dbp.item()
+        loss_sbp = loss_calculate(sbp_hat, sbp, sbp_class_hat, sbp_class, opt.loss_func, 'sbp')
+        loss_dbp = loss_calculate(dbp_hat, dbp, dbp_class_hat, dbp_class, opt.loss_func, 'dbp')
 
-            it_count += 1
+        loss = loss_dbp + loss_sbp
+        loss_meter += loss.item()
+        loss_sbp_meter += loss_sbp.item()
+        loss_dbp_meter += loss_dbp.item()
+        mae_loss += (mae_loss_sbp + mae_loss_dbp).item()
 
-    return loss_meter / it_count, loss_sbp_meter / it_count, loss_dbp_meter / it_count
+        it_count += 1
+
+    return loss_meter / it_count, loss_sbp_meter / it_count, loss_dbp_meter / it_count, mae_loss / it_count
 
 
 def train(opt):
@@ -181,13 +251,14 @@ def train(opt):
     for epoch in range(start_epoch, opt.n_epochs):
         since = time.time()
 
-        train_loss, train_sbp_loss, train_dbp_loss, = train_epoch(model, optimizer, train_loader, opt)
-        val_loss, val_sbp_loss, val_dbp_loss = val_epoch(model, val_loader, opt)
+        train_loss, train_sbp_loss, train_dbp_loss, train_mae_loss = train_epoch(model, optimizer, train_loader, opt)
+        val_loss, val_sbp_loss, val_dbp_loss, val_mae_loss = val_epoch(model, val_loader, opt)
 
         print('#epoch: %02d stage: %d train_loss: %.3e val_loss: %0.3e time: %s'
               % (epoch, stage, train_loss, val_loss, utils.print_time_cost(since)), end='\n')
-        print('#train_sbp_loss: %.3e train_dbp_loss: %0.3e val_sbp_loss: %.3e val_dbp_loss: %.3e\n'
-              % (train_sbp_loss, train_dbp_loss, val_sbp_loss, val_dbp_loss))
+        print(
+            '#train_sbp_loss: %.3e train_dbp_loss: %0.3e val_sbp_loss: %.3e val_dbp_loss: %.3e train_mae_loss: %.3e val_mae_loss: %.3e\n'
+            % (train_sbp_loss, train_dbp_loss, val_sbp_loss, val_dbp_loss, train_mae_loss, val_mae_loss))
 
         writer = SummaryWriter(model_save_dir)
         writer.add_scalar('train_loss', train_loss, epoch)
@@ -219,9 +290,9 @@ def train(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--model", type=str, default='msr_tf_bp', help="model type")
-    parser.add_argument("-d", "--describe", type=str, default='3 channel', help="describe for this model")
+    parser.add_argument("-d", "--describe", type=str, default='multi_task_v1', help="describe for this model")
     parser.add_argument("-n", "--n_epochs", type=int, default=60, help="number of epochs of training")
-    parser.add_argument("-b", "--batch", type=int, default=64, help="batch size of training")
+    parser.add_argument("-b", "--batch", type=int, default=1024, help="batch size of training")
     parser.add_argument("-bl", "--best_loss", type=int, default=1e3, help="best_loss")
     parser.add_argument("-lr", "--lr", type=int, default=1e-3, help="learning rate")
     parser.add_argument("-se", "--start_epoch", type=int, default=1, help="start_epoch")
@@ -230,8 +301,8 @@ if __name__ == '__main__':
     parser.add_argument("-wd", "--weight_decay", type=int, default=1e-3, help="weight_decay")
     parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--show_interval', type=int, default=50, help='how long to show the loss value')
-    parser.add_argument('--loss_func', type=str, default='bp_bucketing_loss',
-                        choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss'),
+    parser.add_argument('--loss_func', type=str, default='multi_task_loss',
+                        choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss', 'multi_task_loss'),
                         help='which loss function is selected')
     args = parser.parse_args()
     print(f'args: {vars(args)}')
