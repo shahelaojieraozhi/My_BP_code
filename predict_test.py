@@ -178,21 +178,21 @@ def evaluate(test_path):
     # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
     # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
 
-    # print("SBP Mean Absolute Error (MAE):", sbp_mae)
-    # print("DBP Mean Absolute Error (MAE):", dbp_mae)
-
-    print()
-    print("SBP Standard Deviation (SD):", sbp_sd)
     print("SBP Mean Absolute Error (MAE):", sbp_mae)
-    print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
-    print("SBP Correlation Coefficient (r-value):", sbp_r_value)
-    print()
-
-    print("DBP Standard Deviation (SD):", dbp_sd)
     print("DBP Mean Absolute Error (MAE):", dbp_mae)
-    print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
-    print("DBP Correlation Coefficient (r-value):", dbp_r_value)
-    print()
+
+    # print()
+    # print("SBP Standard Deviation (SD):", sbp_sd)
+    # print("SBP Mean Absolute Error (MAE):", sbp_mae)
+    # print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
+    # print("SBP Correlation Coefficient (r-value):", sbp_r_value)
+    # print()
+    #
+    # print("DBP Standard Deviation (SD):", dbp_sd)
+    # print("DBP Mean Absolute Error (MAE):", dbp_mae)
+    # print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
+    # print("DBP Correlation Coefficient (r-value):", dbp_r_value)
+    # print()
 
 
 if __name__ == '__main__':
@@ -202,11 +202,11 @@ if __name__ == '__main__':
     # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no_decay', help="model name")  # best
     # parser.add_argument("-m", "--model_name", type=str, default='msr_tf_bp_normal_bp_2023111308', help="model to execute")
     parser.add_argument("-mn", "--model_name", type=str,
-                        default='msr_tf_bp_bs=4096_normal_bp_mse_no_fixed_lr_2023111612',
+                        default='msr_tf_bp_3 channel_2023111302',
                         help="model to execute")  # vs cvprw
     parser.add_argument("-m", "--model", type=str, default='msr_tf_bp', choices=('msr_tf_bp', 'cvprw'),
                         help="model to execute")  # vs cvprw
-    parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
+    parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--loss_func', type=str, default='HuberLoss',
                         choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss', 'HuberLoss'),
                         help='which loss function is selected')
