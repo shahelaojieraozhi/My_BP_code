@@ -13,7 +13,7 @@ import torch
 import matplotlib.pyplot as plt
 
 # mode = 'train'
-mode = 'val'
+mode = 'test'
 ppg = torch.load("../data_normal/" + mode + "/ppg.h5")
 
 # batch show
