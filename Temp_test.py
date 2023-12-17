@@ -266,45 +266,61 @@ import torch
 # print(result)
 
 
+# import torch
+# import torch.nn as nn
+# import torch.nn.functional as F
+#
+#
+# class FocalLoss(nn.Module):
+#     def __init__(self, gamma=2, alpha=1, reduction='mean'):
+#         super(FocalLoss, self).__init__()
+#         self.gamma = gamma
+#         self.alpha = alpha
+#         self.reduction = reduction
+#
+#     def forward(self, input, target):
+#         # input: predictions, target: ground truth
+#         ce_loss = F.smooth_l1_loss(input, target, reduction='none')
+#         p_t = torch.exp(-ce_loss)
+#         focal_loss = (self.alpha * (1 - p_t) ** self.gamma * ce_loss).mean()
+#
+#         if self.reduction == 'sum':
+#             return focal_loss.sum()
+#         elif self.reduction == 'mean':
+#             return focal_loss
+#         else:
+#             raise ValueError("Invalid reduction option. Use 'mean' or 'sum'.")
+#
+#
+# # Example usage:
+# # Assuming you have a regression model and your data loader returns (input, target)
+# model = YourRegressionModel()
+# criterion = FocalLoss(gamma=2, alpha=1, reduction='mean')
+# optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+#
+# # Training loop
+# for epoch in range(num_epochs):
+#     for input, target in dataloader:
+#         optimizer.zero_grad()
+#         output = model(input)
+#         loss = criterion(output, target)
+#         loss.backward()
+#         optimizer.step()
+#
+# # Remember to adapt this code according to your specific use case, model architecture, and data format.
+
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
+# 示例的原始逻辑（logits）和真实标签
+logits = torch.tensor([0.5, -1.0, 2.0], dtype=torch.float32)
+labels = torch.tensor([1, 0, 1], dtype=torch.float32)  # 二进制标签（0或1）
 
-class FocalLoss(nn.Module):
-    def __init__(self, gamma=2, alpha=1, reduction='mean'):
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-        self.reduction = reduction
+# 二分类交叉熵损失（BCEWithLogitsLoss）
+criterion = nn.BCEWithLogitsLoss(reduction='none')
+loss = criterion(logits, labels)
 
-    def forward(self, input, target):
-        # input: predictions, target: ground truth
-        ce_loss = F.smooth_l1_loss(input, target, reduction='none')
-        p_t = torch.exp(-ce_loss)
-        focal_loss = (self.alpha * (1 - p_t) ** self.gamma * ce_loss).mean()
-
-        if self.reduction == 'sum':
-            return focal_loss.sum()
-        elif self.reduction == 'mean':
-            return focal_loss
-        else:
-            raise ValueError("Invalid reduction option. Use 'mean' or 'sum'.")
-
-
-# Example usage:
-# Assuming you have a regression model and your data loader returns (input, target)
-model = YourRegressionModel()
-criterion = FocalLoss(gamma=2, alpha=1, reduction='mean')
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-# Training loop
-for epoch in range(num_epochs):
-    for input, target in dataloader:
-        optimizer.zero_grad()
-        output = model(input)
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-
-# Remember to adapt this code according to your specific use case, model architecture, and data format.
+print("原始逻辑（logits）:", logits)
+print("真实标签:", labels)
+print("二分类交叉熵损失:", loss)

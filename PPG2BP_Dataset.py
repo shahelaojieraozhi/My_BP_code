@@ -10,6 +10,7 @@
 """
 import torch
 from torch.utils.data import Dataset
+import matplotlib.pyplot as plt
 
 
 def use_derivative(x_input, fs=125):
@@ -76,5 +77,8 @@ if __name__ == '__main__':
     data = PPG2BPDataset(mode='test')
     datasize = len(data)
     print(datasize)
-    # pulse, sbp, dbp = data[1]
+    for sample in data:
+        pulse, sbp, dbp = sample
+        plt.plot(pulse.squeeze())
+        plt.show()
     # b = data[0]

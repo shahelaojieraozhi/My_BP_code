@@ -198,20 +198,15 @@ def evaluate(test_path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--batch", type=int, default=4096, help="batch size of training")
-    # logs/11_9_add_wd/best_w.pth
-    # parser.add_argument("-m", "--model_name", type=str, default='cvpr_no_decay', help="model name")  # best
-    # parser.add_argument("-m", "--model_name", type=str, default='msr_tf_bp_normal_bp_2023111308', help="model to execute")
     parser.add_argument("-mn", "--model_name", type=str,
-                        default='msr_tf_bp_3 channel_2023111302',
+                        default='msr_tf_bp_L2+Hinge_loss_deta=9_2023121502',
                         help="model to execute")  # vs cvprw
     parser.add_argument("-m", "--model", type=str, default='msr_tf_bp', choices=('msr_tf_bp', 'cvprw'),
                         help="model to execute")  # vs cvprw
-    parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
+    parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
     parser.add_argument('--loss_func', type=str, default='HuberLoss',
                         choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss', 'HuberLoss'),
                         help='which loss function is selected')
-    # parser.add_argument("-tp", "--test_data_path", type=str,
-    #                     default='G:\\Blood_Pressure_dataset\\cvprw\\h5_record\\test', help="test data path")
     opt = parser.parse_args()
 
     input_channel = 3 if opt.using_derivative else 1
