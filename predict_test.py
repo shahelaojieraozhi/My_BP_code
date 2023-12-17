@@ -19,7 +19,9 @@ from model.resnet18_1D import resnet18_1d
 from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
 from model.MSR_tranformer_bp import msr_tf_bp
 
-from PPG2BP_Dataset import PPG2BPDataset, use_derivative
+# from PPG2BP_Dataset import PPG2BPDataset, use_derivative
+from PPG2BP_Dataset_filter_pulse import PPG2BPDataset, use_derivative
+
 from model.bpnet_cvprw import resnet50
 import os
 from scipy.stats import pearsonr
@@ -199,12 +201,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--batch", type=int, default=4096, help="batch size of training")
     parser.add_argument("-mn", "--model_name", type=str,
-                        default='msr_tf_bp_L2+Hinge_loss_deta=9_2023121502',
+                        # default='best_filter_pulse',
+                        # default='msr_tf_bp_SmoothL1Loss_filter_data_sec_2023121708',
+                        default='msr_tf_bp_SmoothL1Loss_data_split_2023121709',
                         help="model to execute")  # vs cvprw
     parser.add_argument("-m", "--model", type=str, default='msr_tf_bp', choices=('msr_tf_bp', 'cvprw'),
                         help="model to execute")  # vs cvprw
     parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
-    parser.add_argument('--loss_func', type=str, default='HuberLoss',
+    parser.add_argument('--loss_func', type=str, default='SmoothL1Loss',
                         choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss', 'HuberLoss'),
                         help='which loss function is selected')
     opt = parser.parse_args()
@@ -239,6 +243,7 @@ if __name__ == '__main__':
     # print model name
     describe = ""
     print(opt.model_name)
+    print(f"best epoch: {best_epoch}")
     print(describe)
 
     evaluate(pre_path)

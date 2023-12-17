@@ -8,9 +8,9 @@
 @IDE     ：PyCharm 
 
 """
-import numpy as np
 import torch
 from torch.utils.data import Dataset
+import matplotlib.pyplot as plt
 
 
 def use_derivative(x_input, fs=125):
@@ -45,38 +45,14 @@ class PPG2BPDataset(Dataset):
 
         # self.ppg = torch.load("data/" + mode + "/ppg.h5")
         # self.BP = torch.load("data/" + mode + "/BP.h5")
-        self.ppg = torch.load("data_normal/" + mode + "/ppg.h5")
-        self.BP = torch.load("data_normal/" + mode + "/BP.h5")
+
+        self.ppg = torch.load("pulse_abnormal_detection/dataset/" + mode + "/ppg.h5")
+        self.BP = torch.load("pulse_abnormal_detection/dataset/" + mode + "/BP.h5")
 
         # self.sbp = (self.BP[:, 0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
         # self.dbp = (self.BP[:, 1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
         self.sbp = self.BP[:, 0]
         self.dbp = self.BP[:, 1]
-        # self.sbp_labels = ((self.sbp - 75) // 10)  # between 0 and 8
-        # # a = ((self.sbp - 75) // 10)[:100]
-        # self.dbp_labels = ((self.dbp - 40) // 10)  # between 0 ~ 4
-
-        sbp_boundaries = torch.tensor([80, 90, 100, 110, 120, 130, 140, 150, 160])  # sbp 75 ~ 165
-        # b = self.sbp[:10]
-        # a = torch.bucketize(self.sbp, boundaries)[:10]
-        self.sbp_class_label = torch.bucketize(self.sbp.contiguous(), sbp_boundaries)  # 10 class
-
-        # self.sbp_value = torch.FloatTensor([80, 90, 100, 110, 120, 130, 140, 150, 160, 170])
-        # a = np.array(int((self.sbp - 75) // 10)).tolist()
-        # a = ((self.sbp - 75) // 10)
-        # self.sbp_labels = [self.sbp_value[x.long()] for x in ((self.sbp - 75) // 10)]  # between 0 and 8
-
-        dbp_boundaries = torch.tensor([45, 55, 65, 75])  # # sbp 40 ~ 80
-        # a = self.dbp.contiguous()
-        # b = self.dbp
-        self.dbp_class_label = torch.bucketize(self.dbp.contiguous(), dbp_boundaries)  # 5 class
-        # self.sbp_labels = ((self.sbp - 75) // 10)  # between 0 and 8
-        # a = ((self.sbp - 75) // 10)[:100]
-
-        # self.dbp_value = [45, 55, 65, 75, 85]
-        # self.dbp_labels = [self.dbp_value[x.long()] for x in ((self.dbp - 40) // 10)]  # between 0 ~ 4
-        # self.dbp_labels = ((self.dbp - 40) // 10)  # between 0 ~ 4
-        print()
 
     def __getitem__(self, index):
         ppg = self.ppg[index, :]
@@ -87,12 +63,10 @@ class PPG2BPDataset(Dataset):
         sbp = self.sbp[index]
         dbp = self.dbp[index]
 
-        sbp_class = self.sbp_class_label[index]
-        dbp_class = self.dbp_class_label[index]
         # sbp = (bp[0] - self.SBP_min) / (self.SBP_max - self.SBP_min)
         # dbp = (bp[1] - self.DBP_min) / (self.DBP_max - self.DBP_min)
 
-        return ppg, sbp, dbp, sbp_class, dbp_class
+        return ppg, sbp, dbp
 
     def __len__(self):
         # return len(self.h5_path_list) * 1000
@@ -103,10 +77,8 @@ if __name__ == '__main__':
     data = PPG2BPDataset(mode='test')
     datasize = len(data)
     print(datasize)
-
-    pulse, sbp, dbp, sbp_class_label, dbp_class_label = data[0]
-    print(pulse.shape)
-    print(sbp)
-    print(dbp)
-    print(sbp_class_label)
-    print(dbp_class_label)
+    for sample in data:
+        pulse, sbp, dbp = sample
+        plt.plot(pulse.squeeze())
+        plt.show()
+    # b = data[0]
