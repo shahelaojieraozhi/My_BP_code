@@ -17,7 +17,8 @@ from torch.utils.data import DataLoader
 from model.resnet18_1D import resnet18_1d
 # from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
 from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
-from model.MSR_tranformer_bp import msr_tf_bp
+# from model.MSR_tranformer_bp import msr_tf_bp
+from model.MSR_tranformer_bp_v4 import msr_tf_bp
 
 # from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 from PPG2BP_Dataset_filter_pulse import PPG2BPDataset, use_derivative
@@ -203,11 +204,16 @@ if __name__ == '__main__':
     parser.add_argument("-mn", "--model_name", type=str,
                         # default='best_filter_pulse',
                         # default='msr_tf_bp_SmoothL1Loss_filter_data_sec_2023121708',
-                        default='msr_tf_bp_SmoothL1Loss_data_split_2023121709',
+                        # default='msr_tf_bp_SmoothL1Loss_data_split_2023121709',
+                        # default='msr_tf_bp_SmoothL1Loss_data_split+derivative_2023121801',
+                        # default='msr_tf_bp_mse_data_split+derivative_2023121802',
+                        # default='msr_tf_attention_bp_mse_data_split+derivative_2023121908',
+                        # default='cvprw_split_data__2023121909',   # new baseline
+                        default='mymodel',   # new baseline
                         help="model to execute")  # vs cvprw
     parser.add_argument("-m", "--model", type=str, default='msr_tf_bp', choices=('msr_tf_bp', 'cvprw'),
-                        help="model to execute")  # vs cvprw
-    parser.add_argument('--using_derivative', default=False, help='using derivative of PPG or not')
+                        help="model to execute")
+    parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--loss_func', type=str, default='SmoothL1Loss',
                         choices=('SmoothL1Loss', 'mse', 'bp_bucketing_loss', 'HuberLoss'),
                         help='which loss function is selected')
