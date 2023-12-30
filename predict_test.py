@@ -18,7 +18,8 @@ from model.resnet18_1D import resnet18_1d
 # from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
 from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
 # from model.MSR_tranformer_bp import msr_tf_bp
-from model.MSR_tranformer_bp_v4 import msr_tf_bp
+# from model.MSR_tranformer_bp_v2 import msr_tf_bp
+from model.MSR_tranformer_bp_v10 import msr_tf_bp
 
 # from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 from PPG2BP_Dataset_filter_pulse import PPG2BPDataset, use_derivative
@@ -145,19 +146,17 @@ def plot_coordinates(gt_bp, pre_bp, sd, mae, sbp=True):
 
 
 def calculate_metrics(array1, array2):
-    # Standard Deviation (SD)
-    sd = np.std(array1 - array2)
-
     # Mean Absolute Error (MAE)
     mae = np.mean(np.abs(array1 - array2))
 
-    # Root Mean Square Error (RMSE)
-    rmse = np.sqrt(np.mean((array1 - array2) ** 2))
+    # Standard Deviation
+    std = np.sqrt(np.mean((abs(array1 - array2) - mae) ** 2))
+    # sd = np.std(array1 - array2)
 
     # Correlation Coefficient (r-value)
     r_value, _ = pearsonr(array1, array2)
 
-    return sd, mae, rmse, r_value
+    return mae, std, r_value
 
 
 def evaluate(test_path):
@@ -175,27 +174,39 @@ def evaluate(test_path):
     sbp_arr = bps['sbp_arr']
     dbp_arr = bps['dbp_arr']
 
-    sbp_sd, sbp_mae, sbp_rmse, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
-    dbp_sd, dbp_mae, dbp_rmse, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
+    map_arr = bps['dbp_arr'] + (bps['sbp_arr'] - bps['dbp_arr']) / 3
+    map_hat_arr = bps['dbp_hat_arr'] + (bps['sbp_hat_arr'] - bps['dbp_hat_arr']) / 3
+
+    # mae, std, rmse, r_value
+    sbp_mae, sbp_std, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
+    dbp_mae, dbp_std, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
+    map_mae, map_std, map_r_value = calculate_metrics(map_hat_arr, map_arr)
 
     # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
     # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
 
-    print("SBP Mean Absolute Error (MAE):", sbp_mae)
-    print("DBP Mean Absolute Error (MAE):", dbp_mae)
-
-    # print()
-    # print("SBP Standard Deviation (SD):", sbp_sd)
     # print("SBP Mean Absolute Error (MAE):", sbp_mae)
-    # print("SBP Root Mean Square Error (RMSE):", sbp_rmse)
-    # print("SBP Correlation Coefficient (r-value):", sbp_r_value)
-    # print()
-    #
-    # print("DBP Standard Deviation (SD):", dbp_sd)
     # print("DBP Mean Absolute Error (MAE):", dbp_mae)
-    # print("DBP Root Mean Square Error (RMSE):", dbp_rmse)
-    # print("DBP Correlation Coefficient (r-value):", dbp_r_value)
-    # print()
+
+    print()
+    print("SBP Mean Absolute Error (MAE):", sbp_mae)
+    print("SBP Standard Deviation (STD):", sbp_std)
+    print("SBP Correlation Coefficient (r-value):", sbp_r_value)
+    print()
+
+    print("DBP Mean Absolute Error (MAE):", dbp_mae)
+    print("DBP Standard Deviation (STD):", dbp_std)
+    print("DBP Correlation Coefficient (r-value):", dbp_r_value)
+    print()
+
+    print("MAP Mean Absolute Error (MAE):", map_mae)
+    print("MAP Standard Deviation (STD):", map_std)
+    print("MAP Correlation Coefficient (r-value):", map_r_value)
+    print()
+
+    result_metrics = [sbp_mae, sbp_std, sbp_r_value, dbp_mae, dbp_std, dbp_r_value, map_mae, map_std, map_r_value]
+
+    return result_metrics
 
 
 if __name__ == '__main__':
@@ -208,10 +219,12 @@ if __name__ == '__main__':
                         # default='msr_tf_bp_SmoothL1Loss_data_split+derivative_2023121801',
                         # default='msr_tf_bp_mse_data_split+derivative_2023121802',
                         # default='msr_tf_attention_bp_mse_data_split+derivative_2023121908',
-                        # default='cvprw_split_data__2023121909',   # new baseline
-                        default='mymodel',   # new baseline
+                        default='cvprw_split_data__2023121909',   # new baseline
+                        # default='msr_tf_bp_best_dbp_2023122107'
+                        # default='msr_tf_bp_se__2023122503'
+                        # default='msr_tf_bp-se_before pooling_2023122700',  # best
                         help="model to execute")  # vs cvprw
-    parser.add_argument("-m", "--model", type=str, default='msr_tf_bp', choices=('msr_tf_bp', 'cvprw'),
+    parser.add_argument("-m", "--model", type=str, default='cvprw', choices=('msr_tf_bp', 'cvprw'),
                         help="model to execute")
     parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--loss_func', type=str, default='SmoothL1Loss',
@@ -239,6 +252,7 @@ if __name__ == '__main__':
     model = model.to(device)
 
     "load model"
+    # model.load_state_dict(torch.load('logs/' + opt.model_name + '/dbp_best_w.pth')['state_dict'])
     model.load_state_dict(torch.load('logs/' + opt.model_name + '/best_w.pth')['state_dict'])
     best_epoch = torch.load('logs/' + opt.model_name + '/best_w.pth')["epoch"]
     pre_path = os.path.join("predict_test", opt.model_name)
@@ -252,8 +266,10 @@ if __name__ == '__main__':
     print(f"best epoch: {best_epoch}")
     print(describe)
 
-    evaluate(pre_path)
+    metrics = evaluate(pre_path)
+    metrics.append(test_loss)
     print("Test loss:", test_loss)
+    pd.DataFrame(metrics).T.to_csv("evaluate/metric_result.csv", header=False, index=False)
 
 # tensorboard --logdir=resnet18_202307141720 --port=6007
 # tensorboard --logdir=add_normal_res_18 --port=6007

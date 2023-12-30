@@ -310,17 +310,68 @@ import torch
 # # Remember to adapt this code according to your specific use case, model architecture, and data format.
 
 
-import torch
-import torch.nn as nn
+# import torch
+# import torch.nn as nn
+#
+# # 示例的原始逻辑（logits）和真实标签
+# logits = torch.tensor([0.5, -1.0, 2.0], dtype=torch.float32)
+# labels = torch.tensor([1, 0, 1], dtype=torch.float32)  # 二进制标签（0或1）
+#
+# # 二分类交叉熵损失（BCEWithLogitsLoss）
+# criterion = nn.BCEWithLogitsLoss(reduction='none')
+# loss = criterion(logits, labels)
+#
+# print("原始逻辑（logits）:", logits)
+# print("真实标签:", labels)
+# print("二分类交叉熵损失:", loss)
 
-# 示例的原始逻辑（logits）和真实标签
-logits = torch.tensor([0.5, -1.0, 2.0], dtype=torch.float32)
-labels = torch.tensor([1, 0, 1], dtype=torch.float32)  # 二进制标签（0或1）
 
-# 二分类交叉熵损失（BCEWithLogitsLoss）
-criterion = nn.BCEWithLogitsLoss(reduction='none')
-loss = criterion(logits, labels)
+# import numpy as np
+# import pywt
+# import matplotlib.pyplot as plt
+# from scipy import signal
+#
+# # 生成一个示例的PPG波形
+# fs = 1000  # 采样率
+# t = np.arange(0, 10, 1 / fs)  # 时间向量
+# ppg_signal = np.sin(2 * np.pi * 1 * t) + 0.5 * np.sin(2 * np.pi * 2.5 * t)
+#
+# # 进行小波变换
+# cwtmatr, freqs = pywt.cwt(ppg_signal, scales=np.arange(1, 128), wavelet='cmor')
+#
+# # 显示PPG波形
+# plt.figure(figsize=(12, 6))
+# plt.subplot(2, 1, 1)
+# plt.plot(t, ppg_signal)
+# plt.title('PPG Signal')
+#
+# # 显示小波变换结果
+# plt.subplot(2, 1, 2)
+# plt.imshow(np.abs(cwtmatr), extent=[0, 10, 1, 128], aspect='auto', cmap='jet')
+# plt.colorbar(label='Magnitude')
+# plt.title('Continuous Wavelet Transform')
+# plt.ylabel('Scale')
+# plt.xlabel('Time (seconds)')
+#
+# plt.tight_layout()
+# plt.show()
 
-print("原始逻辑（logits）:", logits)
-print("真实标签:", labels)
-print("二分类交叉熵损失:", loss)
+
+# # 显示PPG波形
+# plt.figure(figsize=(12, 6))
+# plt.subplot(2, 1, 1)
+# plt.plot(t, ppg_signal)
+# plt.title('PPG Signal')
+#
+# # 显示短时傅里叶变换结果
+# plt.subplot(2, 1, 2)
+# # plt.pcolormesh(times, frequencies, 20 * np.log10(Sxx), shading='gouraud')
+#
+#
+# plt.colorbar(label='Power/Frequency (dB/Hz)')
+# plt.title('Short-Time Fourier Transform')
+# plt.ylabel('Frequency (Hz)')
+# plt.xlabel('Time (seconds)')
+#
+# plt.tight_layout()
+# plt.show()

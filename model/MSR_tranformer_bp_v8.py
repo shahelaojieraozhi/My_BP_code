@@ -3,61 +3,31 @@
 @Project ：My_BP_code 
 @Time    : 2023/10/22 12:22
 @Author  : Rao Zhi
-@File    : MSR_tranformer_bp_v4.py
+@File    : MSR_tranformer_bp_v2.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
-@描述     :使用 point wise 卷积进行了跳转连接
-@detail   ：
-@infer    :
+
 """
 import torch.nn as nn
 import torch
-import torch.nn.functional as F
 
 
-class ChannelAttentionModule(nn.Module):
-    def __init__(self, channel, ratio=16):
-        super(ChannelAttentionModule, self).__init__()
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool1d(1)
-        self.max_pool = nn.AdaptiveMaxPool1d(1)
-
-        self.shared_MLP = nn.Sequential(
-            nn.Conv1d(channel, channel // ratio, 1, bias=False),
-            nn.ReLU(),
-            nn.Conv1d(channel // ratio, channel, 1, bias=False)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
         )
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        avgout = self.shared_MLP(self.avg_pool(x))
-        maxout = self.shared_MLP(self.max_pool(x))
-        return self.sigmoid(avgout + maxout)
-
-
-class SpatialAttentionModule(nn.Module):
-    def __init__(self):
-        super(SpatialAttentionModule, self).__init__()
-        self.conv1d = nn.Conv1d(in_channels=2, out_channels=1, kernel_size=7, stride=1, padding=3)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        avgout = torch.mean(x, dim=1, keepdim=True)
-        maxout, _ = torch.max(x, dim=1, keepdim=True)
-        out = torch.cat([avgout, maxout], dim=1)
-        out = self.sigmoid(self.conv1d(out))
-        return out
-
-
-class CBAM(nn.Module):
-    def __init__(self, channel):
-        super(CBAM, self).__init__()
-        self.channel_attention = ChannelAttentionModule(channel)
-        self.spatial_attention = SpatialAttentionModule()
-
-    def forward(self, x):
-        out = self.channel_attention(x) * x
-        out = self.spatial_attention(out) * out
-        return out
+        b, c, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1)
+        return x * y.expand_as(x)
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -177,7 +147,7 @@ class BasicBlock7x7(nn.Module):
 
 
 class msr_tf_bp(nn.Module):
-    def __init__(self, input_channel, layers=[1, 1, 1, 1], num_classes=10):
+    def __init__(self, input_channel, layers=[1, 1, 1, 1], num_classes=10, reduction=16):
         """
         inplanes 是提供给block的通道数，planes表示block的输出通道。
         大家知道，在做残差相加的时候，我们必须保证残差的维度与真正输出的维度相等（注意这里维度是宽高以及深度）这样我们才能把它们堆到一起，所以程序中出现了降采样操作。
@@ -191,16 +161,11 @@ class msr_tf_bp(nn.Module):
 
         self.conv1 = nn.Conv1d(input_channel, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
-
-        self.conv1_ = nn.Conv1d(input_channel, 32, kernel_size=13, stride=5, padding=1,
-                                bias=False)
-        self.bn1_ = nn.BatchNorm1d(32)
-
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
 
-        self.avgpool_ = nn.AdaptiveAvgPool1d(1)
+        self.se = SELayer(64, reduction)
 
         self.layer3x3_1 = self._make_layer3(BasicBlock3x3, 64, layers[0], stride=1)
         self.layer3x3_2 = self._make_layer3(BasicBlock3x3, 128, layers[1], stride=2)
@@ -222,27 +187,15 @@ class msr_tf_bp(nn.Module):
         self.layer7x7_4 = self._make_layer7(BasicBlock7x7, 512, layers[3], stride=2)
         # self.maxpool7 = nn.AvgPool1d(kernel_size=6, stride=1, padding=0)
 
-        # 注意力模块
-        # self.attention = AttentionBlock(64)
-        # self.attention_256 = AttentionBlock(256)
-
-        self.attention_64 = CBAM(channel=64)
-        self.attention_128 = CBAM(channel=128)
-        self.attention_256 = CBAM(channel=256)
-        self.attention_512 = CBAM(channel=512)
-
-        self.point_wise_conv_1 = nn.Conv1d(in_channels=32, out_channels=128, kernel_size=1)
-        self.point_wise_conv_2 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=1)
-
         # self.drop = nn.Dropout(p=0.2)
-        self.drop = nn.Dropout(0.3)
+        self.drop = nn.Dropout(0.2)
 
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         """
         self.avgpool = nn.AdaptiveAvgPool1d(H, w)   nn.AdaptiveAvgPool1d(1) 即为 (1, 1)
         自适应池化, 对输入信号，提供自适应平均池化操作 对于任何输入大小的输入，可以将输出尺寸指定为H*W， 但是输入和输出特征的数目不会变化。
         """
-        self.fc = nn.Linear(256 * 4, num_classes)
+        self.fc = nn.Linear(256 * 3, num_classes)
         self.sigmoid = nn.Sigmoid()
 
         encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=8)
@@ -309,24 +262,20 @@ class msr_tf_bp(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x0):  # (1024, 1, 512)
-
-        x_ = self.conv1_(x0)  # (1024, 64, 438)
-        x_ = self.bn1_(x_)
-        x_ = self.relu(x_)
-        x_ = self.avgpool_(x_)  # (1024, 64, 219)
-        x_ = self.point_wise_conv_1(x_)  # (1024, 128, 875)
-        x_ = self.point_wise_conv_2(x_)
-
         x0 = self.conv1(x0)  # (1024, 64, 438)
         x0 = self.bn1(x0)
         x0 = self.relu(x0)
         x0 = self.maxpool(x0)  # (1024, 64, 219)
 
-        # # 注意力模块
-        x0 = self.attention_64(x0)
-        x0 = self.attention(x0)
+        residual = x0
+        x0 = self.se(x0)
+        x0 += residual
 
         x = self.layer3x3_1(x0)  # (1024, 64, 219)
+        residual1 = x
+        x = self.se(x)
+        x += residual1
+
         x = self.layer3x3_2(x)  # (1024, 128, 110)
         x = self.layer3x3_3(x)  # (1024, 256, 55)
         # x = self.layer3x3_4(x)  # (1024, 512, 28)
@@ -334,6 +283,9 @@ class msr_tf_bp(nn.Module):
         x = self.avgpool(x)  # (1024, 256, 1)
 
         y = self.layer5x5_1(x0)  # (1024, 64, 215)
+        residual2 = y
+        y = self.se(y)
+        y += residual2
         y = self.layer5x5_2(y)  # (1024, 128, 105)
         y = self.layer5x5_3(y)  # (1024, 256, 50)
         # y = self.layer5x5_4(y)  # (1024, 512, 22)
@@ -341,16 +293,16 @@ class msr_tf_bp(nn.Module):
         y = self.avgpool(y)  # (1024, 256, 1)
 
         z = self.layer7x7_1(x0)  # (1024, 64, 211)
+        residual3 = z
+        z = self.se(z)
+        z += residual3
         z = self.layer7x7_2(z)  # (1024, 128, 100)
         z = self.layer7x7_3(z)  # (1024, 256, 44)
         # z = self.layer7x7_4(z)   # (1024, 512, 16)
         # z = self.maxpool7(z)   # (1024, 256, 1)
         z = self.avgpool(z)  # (1024, 256, 1)
 
-        out = torch.cat([x, y, z, x_], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
-
-        # out = self.attention_256(out)
-
+        out = torch.cat([x, y, z], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
         out = torch.transpose(out, 0, 2)  # (3, 256, 1024)
         out = torch.transpose(out, 1, 2)  # (3, 1024, 256)
 

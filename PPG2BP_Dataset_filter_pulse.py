@@ -8,9 +8,12 @@
 @IDE     ：PyCharm 
 
 """
+import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader
 
 
 def use_derivative(x_input, fs=125):
@@ -77,8 +80,23 @@ if __name__ == '__main__':
     data = PPG2BPDataset(mode='test')
     datasize = len(data)
     print(datasize)
+
     for sample in data:
         pulse, sbp, dbp = sample
-        plt.plot(pulse.squeeze())
+        pulse = pulse.unsqueeze(dim=0)
+        inputs = use_derivative(pulse).squeeze()
+        ppg = inputs[0, :]
+        dt1 = inputs[1, :]
+        dt2 = inputs[2, :]
+        plt.figure(figsize=[12, 4])
+        plt.subplot(1, 3, 1)
+        plt.plot(ppg)
+        plt.subplot(1, 3, 2)
+        plt.plot(dt1)
+        plt.subplot(1, 3, 3)
+        plt.plot(dt2)
         plt.show()
+        pd.DataFrame(ppg.numpy()).to_csv("ppg.csv", header=False, index=False)
+        pd.DataFrame(dt1.numpy()).to_csv("dt1.csv", header=False, index=False)
+        pd.DataFrame(dt2.numpy()).to_csv("dt2.csv", header=False, index=False)
     # b = data[0]

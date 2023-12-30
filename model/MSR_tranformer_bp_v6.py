@@ -15,51 +15,6 @@ import torch
 import torch.nn.functional as F
 
 
-class ChannelAttentionModule(nn.Module):
-    def __init__(self, channel, ratio=16):
-        super(ChannelAttentionModule, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool1d(1)
-        self.max_pool = nn.AdaptiveMaxPool1d(1)
-
-        self.shared_MLP = nn.Sequential(
-            nn.Conv1d(channel, channel // ratio, 1, bias=False),
-            nn.ReLU(),
-            nn.Conv1d(channel // ratio, channel, 1, bias=False)
-        )
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        avgout = self.shared_MLP(self.avg_pool(x))
-        maxout = self.shared_MLP(self.max_pool(x))
-        return self.sigmoid(avgout + maxout)
-
-
-class SpatialAttentionModule(nn.Module):
-    def __init__(self):
-        super(SpatialAttentionModule, self).__init__()
-        self.conv1d = nn.Conv1d(in_channels=2, out_channels=1, kernel_size=7, stride=1, padding=3)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        avgout = torch.mean(x, dim=1, keepdim=True)
-        maxout, _ = torch.max(x, dim=1, keepdim=True)
-        out = torch.cat([avgout, maxout], dim=1)
-        out = self.sigmoid(self.conv1d(out))
-        return out
-
-
-class CBAM(nn.Module):
-    def __init__(self, channel):
-        super(CBAM, self).__init__()
-        self.channel_attention = ChannelAttentionModule(channel)
-        self.spatial_attention = SpatialAttentionModule()
-
-    def forward(self, x):
-        out = self.channel_attention(x) * x
-        out = self.spatial_attention(out) * out
-        return out
-
-
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv1d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -191,10 +146,10 @@ class msr_tf_bp(nn.Module):
 
         self.conv1 = nn.Conv1d(input_channel, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
-
-        self.conv1_ = nn.Conv1d(input_channel, 32, kernel_size=13, stride=5, padding=1,
-                                bias=False)
-        self.bn1_ = nn.BatchNorm1d(32)
+        self.conv2 = nn.Conv1d(input_channel, 64, kernel_size=13, stride=2, padding=3,
+                               bias=False)
+        self.conv3 = nn.Conv1d(input_channel, 64, kernel_size=15, stride=2, padding=3,
+                               bias=False)
 
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -222,27 +177,15 @@ class msr_tf_bp(nn.Module):
         self.layer7x7_4 = self._make_layer7(BasicBlock7x7, 512, layers[3], stride=2)
         # self.maxpool7 = nn.AvgPool1d(kernel_size=6, stride=1, padding=0)
 
-        # 注意力模块
-        # self.attention = AttentionBlock(64)
-        # self.attention_256 = AttentionBlock(256)
-
-        self.attention_64 = CBAM(channel=64)
-        self.attention_128 = CBAM(channel=128)
-        self.attention_256 = CBAM(channel=256)
-        self.attention_512 = CBAM(channel=512)
-
-        self.point_wise_conv_1 = nn.Conv1d(in_channels=32, out_channels=128, kernel_size=1)
-        self.point_wise_conv_2 = nn.Conv1d(in_channels=128, out_channels=256, kernel_size=1)
-
         # self.drop = nn.Dropout(p=0.2)
-        self.drop = nn.Dropout(0.3)
+        self.drop = nn.Dropout(0.2)
 
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         """
         self.avgpool = nn.AdaptiveAvgPool1d(H, w)   nn.AdaptiveAvgPool1d(1) 即为 (1, 1)
         自适应池化, 对输入信号，提供自适应平均池化操作 对于任何输入大小的输入，可以将输出尺寸指定为H*W， 但是输入和输出特征的数目不会变化。
         """
-        self.fc = nn.Linear(256 * 4, num_classes)
+        self.fc = nn.Linear(2304, num_classes)
         self.sigmoid = nn.Sigmoid()
 
         encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=8)
@@ -308,23 +251,22 @@ class msr_tf_bp(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x0):  # (1024, 1, 512)
+    def forward(self, x_):  # (1024, 1, 512)
 
-        x_ = self.conv1_(x0)  # (1024, 64, 438)
-        x_ = self.bn1_(x_)
-        x_ = self.relu(x_)
-        x_ = self.avgpool_(x_)  # (1024, 64, 219)
-        x_ = self.point_wise_conv_1(x_)  # (1024, 128, 875)
-        x_ = self.point_wise_conv_2(x_)
-
-        x0 = self.conv1(x0)  # (1024, 64, 438)
+        x0 = self.conv1(x_)  # (1024, 64, 438)
         x0 = self.bn1(x0)
         x0 = self.relu(x0)
         x0 = self.maxpool(x0)  # (1024, 64, 219)
 
-        # # 注意力模块
-        x0 = self.attention_64(x0)
-        x0 = self.attention(x0)
+        x1 = self.conv2(x_)  # (1024, 64, 438)
+        x1 = self.bn1(x1)
+        x1 = self.relu(x1)
+        x1 = self.maxpool(x1)  # (1024, 64, 219)
+
+        x2 = self.conv3(x_)  # (1024, 64, 438)
+        x2 = self.bn1(x2)
+        x2 = self.relu(x2)
+        x2 = self.maxpool(x2)  # (1024, 64, 219)
 
         x = self.layer3x3_1(x0)  # (1024, 64, 219)
         x = self.layer3x3_2(x)  # (1024, 128, 110)
@@ -347,9 +289,53 @@ class msr_tf_bp(nn.Module):
         # z = self.maxpool7(z)   # (1024, 256, 1)
         z = self.avgpool(z)  # (1024, 256, 1)
 
-        out = torch.cat([x, y, z, x_], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
+        x11 = self.layer3x3_1(x1)  # (1024, 64, 219)
+        x11 = self.layer3x3_2(x11)  # (1024, 128, 110)
+        x11 = self.layer3x3_3(x11)  # (1024, 256, 55)
+        # x = self.layer3x3_4(x)  # (1024, 512, 28)
+        # x = self.maxpool3(x)  # (1024, 256, 1)
+        x11 = self.avgpool(x11)  # (1024, 256, 1)
 
-        # out = self.attention_256(out)
+        y11 = self.layer5x5_1(x1)  # (1024, 64, 215)
+        y11 = self.layer5x5_2(y11)  # (1024, 128, 105)
+        y11 = self.layer5x5_3(y11)  # (1024, 256, 50)
+        # y = self.layer5x5_4(y)  # (1024, 512, 22)
+        # y = self.maxpool5(y)  # (1024, 256, 1)
+        y11 = self.avgpool(y11)  # (1024, 256, 1)
+
+        z11 = self.layer7x7_1(x1)  # (1024, 64, 211)
+        z11 = self.layer7x7_2(z11)  # (1024, 128, 100)
+        z11 = self.layer7x7_3(z11)  # (1024, 256, 44)
+        # z = self.layer7x7_4(z)   # (1024, 512, 16)
+        # z = self.maxpool7(z)   # (1024, 256, 1)
+        z11 = self.avgpool(z11)  # (1024, 256, 1)
+
+        x21 = self.layer3x3_1(x2)  # (1024, 64, 219)
+        x21 = self.layer3x3_2(x21)  # (1024, 128, 110)
+        x21 = self.layer3x3_3(x21)  # (1024, 256, 55)
+        # x = self.layer3x3_4(x)  # (1024, 512, 28)
+        # x = self.maxpool3(x)  # (1024, 256, 1)
+        x21 = self.avgpool(x21)  # (1024, 256, 1)
+
+        y21 = self.layer5x5_1(x2)  # (1024, 64, 215)
+        y21 = self.layer5x5_2(y21)  # (1024, 128, 105)
+        y21 = self.layer5x5_3(y21)  # (1024, 256, 50)
+        # y = self.layer5x5_4(y)  # (1024, 512, 22)
+        # y = self.maxpool5(y)  # (1024, 256, 1)
+        y21 = self.avgpool(y21)  # (1024, 256, 1)
+
+        z21 = self.layer7x7_1(x2)  # (1024, 64, 211)
+        z21 = self.layer7x7_2(z21)  # (1024, 128, 100)
+        z21 = self.layer7x7_3(z21)  # (1024, 256, 44)
+        # z = self.layer7x7_4(z)   # (1024, 512, 16)
+        # z = self.maxpool7(z)   # (1024, 256, 1)
+        z21 = self.avgpool(z21)  # (1024, 256, 1)
+
+        out1 = torch.cat([x, y, z], dim=2)        # (1024, 256, 3) or # (1024, 512, 3)
+        out2 = torch.cat([x11, y11, z11], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
+        out3 = torch.cat([x21, y21, z21], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
+
+        out = torch.cat([out1, out2, out3], dim=2)
 
         out = torch.transpose(out, 0, 2)  # (3, 256, 1024)
         out = torch.transpose(out, 1, 2)  # (3, 1024, 256)

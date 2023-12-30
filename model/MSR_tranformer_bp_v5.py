@@ -242,7 +242,7 @@ class msr_tf_bp(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool1d(H, w)   nn.AdaptiveAvgPool1d(1) 即为 (1, 1)
         自适应池化, 对输入信号，提供自适应平均池化操作 对于任何输入大小的输入，可以将输出尺寸指定为H*W， 但是输入和输出特征的数目不会变化。
         """
-        self.fc = nn.Linear(256 * 4, num_classes)
+        self.fc = nn.Linear(256 * 3, num_classes)
         self.sigmoid = nn.Sigmoid()
 
         encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=8)
@@ -310,12 +310,12 @@ class msr_tf_bp(nn.Module):
 
     def forward(self, x0):  # (1024, 1, 512)
 
-        x_ = self.conv1_(x0)  # (1024, 64, 438)
-        x_ = self.bn1_(x_)
-        x_ = self.relu(x_)
-        x_ = self.avgpool_(x_)  # (1024, 64, 219)
-        x_ = self.point_wise_conv_1(x_)  # (1024, 128, 875)
-        x_ = self.point_wise_conv_2(x_)
+        # x_ = self.conv1_(x0)  # (1024, 64, 438)
+        # x_ = self.bn1_(x_)
+        # x_ = self.relu(x_)
+        # x_ = self.avgpool_(x_)  # (1024, 64, 219)
+        # x_ = self.point_wise_conv_1(x_)  # (1024, 128, 875)
+        # x_ = self.point_wise_conv_2(x_)
 
         x0 = self.conv1(x0)  # (1024, 64, 438)
         x0 = self.bn1(x0)
@@ -324,7 +324,6 @@ class msr_tf_bp(nn.Module):
 
         # # 注意力模块
         x0 = self.attention_64(x0)
-        x0 = self.attention(x0)
 
         x = self.layer3x3_1(x0)  # (1024, 64, 219)
         x = self.layer3x3_2(x)  # (1024, 128, 110)
@@ -347,9 +346,9 @@ class msr_tf_bp(nn.Module):
         # z = self.maxpool7(z)   # (1024, 256, 1)
         z = self.avgpool(z)  # (1024, 256, 1)
 
-        out = torch.cat([x, y, z, x_], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
+        out = torch.cat([x, y, z], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
 
-        # out = self.attention_256(out)
+        out = self.attention_256(out)
 
         out = torch.transpose(out, 0, 2)  # (3, 256, 1024)
         out = torch.transpose(out, 1, 2)  # (3, 1024, 256)
@@ -374,3 +373,5 @@ if __name__ == '__main__':
     inputs = torch.rand(1024, 3, 875)
     outputs = msresnet(inputs)
     print(outputs.size())
+
+

@@ -53,4 +53,3 @@ plt.plot(PPG_resampled)
 # plt.title("降采样后的信号 (30 Hz采样)")
 plt.show()
 
-

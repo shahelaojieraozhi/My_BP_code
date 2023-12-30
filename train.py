@@ -242,5 +242,3 @@ if __name__ == '__main__':
     train(args)
 
 # tensorboard --logdir=cnn_202305061217 --port=6007
-
-
