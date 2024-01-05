@@ -6,7 +6,7 @@
 @File    : MSR_tranformer_bp_v2.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
-@detail  ：one-se
+
 """
 import torch.nn as nn
 import torch
@@ -28,6 +28,43 @@ class SELayer(nn.Module):
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1)
         return x * y.expand_as(x)
+
+
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes, ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool1d(1)
+        self.max_pool = nn.AdaptiveMaxPool1d(1)
+
+        self.fc1 = nn.Conv1d(in_planes, in_planes // 16, 1, bias=False)
+        self.relu1 = nn.ReLU()
+        self.fc2 = nn.Conv1d(in_planes // 16, in_planes, 1, bias=False)
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
+        max_out = self.fc2(self.relu1(self.fc1(self.max_pool(x))))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+
+        self.conv1 = nn.Conv1d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)
+        return self.sigmoid(x)
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -146,7 +183,7 @@ class BasicBlock7x7(nn.Module):
         return out1
 
 
-class  msr_tf_bp(nn.Module):
+class msr_tf_bp(nn.Module):
     def __init__(self, input_channel, layers=[1, 1, 1, 1], num_classes=10, reduction=16):
         """
         inplanes 是提供给block的通道数，planes表示block的输出通道。
@@ -165,7 +202,9 @@ class  msr_tf_bp(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
 
+        # attention module
         self.se = SELayer(64, reduction)
+        self.se_256 = SELayer(256, reduction)
 
         self.layer3x3_1 = self._make_layer3(BasicBlock3x3, 64, layers[0], stride=1)
         self.layer3x3_2 = self._make_layer3(BasicBlock3x3, 128, layers[1], stride=2)
@@ -265,34 +304,30 @@ class  msr_tf_bp(nn.Module):
         x0 = self.conv1(x0)  # (1024, 64, 438)
         x0 = self.bn1(x0)
         x0 = self.relu(x0)
-        x0 = self.maxpool(x0)  # (1024, 64, 219)
 
         residual = x0
         x0 = self.se(x0)
         x0 += residual
 
+        x0 = self.maxpool(x0)  # (1024, 64, 219)
+
         x = self.layer3x3_1(x0)  # (1024, 64, 219)
         x = self.layer3x3_2(x)  # (1024, 128, 110)
         x = self.layer3x3_3(x)  # (1024, 256, 55)
-        # x = self.layer3x3_4(x)  # (1024, 512, 28)
-        # x = self.maxpool3(x)  # (1024, 256, 1)
         x = self.avgpool(x)  # (1024, 256, 1)
 
         y = self.layer5x5_1(x0)  # (1024, 64, 215)
         y = self.layer5x5_2(y)  # (1024, 128, 105)
         y = self.layer5x5_3(y)  # (1024, 256, 50)
-        # y = self.layer5x5_4(y)  # (1024, 512, 22)
-        # y = self.maxpool5(y)  # (1024, 256, 1)
         y = self.avgpool(y)  # (1024, 256, 1)
 
         z = self.layer7x7_1(x0)  # (1024, 64, 211)
         z = self.layer7x7_2(z)  # (1024, 128, 100)
         z = self.layer7x7_3(z)  # (1024, 256, 44)
-        # z = self.layer7x7_4(z)   # (1024, 512, 16)
-        # z = self.maxpool7(z)   # (1024, 256, 1)
         z = self.avgpool(z)  # (1024, 256, 1)
 
         out = torch.cat([x, y, z], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
+
         out = torch.transpose(out, 0, 2)  # (3, 256, 1024)
         out = torch.transpose(out, 1, 2)  # (3, 1024, 256)
 
@@ -300,19 +335,14 @@ class  msr_tf_bp(nn.Module):
         out = torch.transpose(out, 0, 1)  # (1024, 3, 256)
         out = out.reshape(out.size(0), -1)  # (batch_size, -1)
 
-        # out = torch.cat([x, y, z], dim=1)  # (1024, 768, 1)
-        # out = torch.mean(out, dim=0)        # (5, 64)
-        # out = out.squeeze()  # (1024, 768)
-
         out = self.drop(out)
         out = self.fc(out)  # (1024, 6)
-        # out = self.sigmoid(out)  # (2048, 2)
 
         return out
 
 
 if __name__ == '__main__':
-    msresnet = msr_tf_bp(input_channel=3, layers=[1, 1, 1, 1], num_classes=17)
+    msresnet = msr_tf_bp(input_channel=3, layers=[1, 1, 1, 1], num_classes=6)
     inputs = torch.rand(1024, 3, 875)
     outputs = msresnet(inputs)
     print(outputs.size())

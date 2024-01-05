@@ -23,14 +23,16 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import utils
 import sys
-from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
+# from model.Resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 
 # from model.bp_MSR_Net import MSResNet
 
 from model.bpnet_cvprw import resnet50
 # from model.resnet1d import resnet50
-from model.MSR_tranformer_bp_v2 import msr_tf_bp
+# from model.MSR_tranformer_bp_v2 import msr_tf_bp    # msr_tf_bp_mse_data_split+derivative_2023121802
+# from model.MSR_tranformer_bp_v7 import msr_tf_bp      #
+from model.MSR_tranformer_bp_v7 import msr_tf_bp
 
 # from model.MSR_tranformer_bp_ppg_segment import msr_tf_bp_ppg_segment
 # from model.resnet18_1D_segment import resnet18_1d
@@ -145,17 +147,17 @@ def train(opt):
     # model = resnet50(num_input_channels=1, num_classes=2)
     # model = MSResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
 
-    # model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
+    model = resnet50(input_c=1 if input_channel == 1 else 3, num_classes=2)
     # model = resnet18(input_c=1 if input_channel == 1 else 3, num_classes=2)
 
-    if opt.start_epoch != 0:
-        # Load pretrained models
-        model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
-        model.load_state_dict(torch.load('logs/current.pth')['state_dict'])
-    else:
-        # Initialize weights
-        model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
-        model.apply(utils.weights_init_normal)
+    # if opt.start_epoch != 0:
+    #     # Load pretrained models
+    #     model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
+    #     model.load_state_dict(torch.load('logs/current.pth')['state_dict'])
+    # else:
+    #     # Initialize weights
+    #     model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)
+    #     model.apply(utils.weights_init_normal)
 
     model = model.to(device)
     # model_save_dir = f'save/{opt.type}_{time.strftime("%Y%m%d%H%M")}'

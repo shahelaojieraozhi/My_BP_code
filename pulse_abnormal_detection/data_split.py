@@ -9,10 +9,7 @@
 
 """
 import os
-import warnings
-import pandas as pd
 import torch
-from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
 train_ppgs = torch.load("../data_normal/train/ppg.h5")

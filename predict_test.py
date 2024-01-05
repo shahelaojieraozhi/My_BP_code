@@ -3,7 +3,7 @@
 @Project ：My_BP_code 
 @Time    : 2023/7/11 14:45
 @Author  : Rao Zhi
-@File    : predict_test.py
+@File    : evaluate-reproduce_result.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
 
@@ -14,17 +14,24 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from model.resnet18_1D import resnet18_1d
+# from model.resnet18_1D import resnet18_1d
 # from PPG2BP_Dataset_sbp_dbp import PPG2BPDataset
-from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
-# from model.MSR_tranformer_bp import msr_tf_bp
+# from model.Resnet import resnet50, resnet34, resnet18, resnet101, resnet152
+
+# compare with ourselves
+from model.MSR_tranformer_bp import msr_tf_bp  # msr_tf_bp_mse_data_split+derivative_2023121802
+# from model.MK_ResNet import MK_ResNet  # msr_tf_bp_mse_data_split+derivative_2023121802
+from model.ResNet_Transformer import resnet50  # ResNet_Transformer
+
+# from model.MSR_tranformer_bp_v10 import msr_tf_bp
 # from model.MSR_tranformer_bp_v2 import msr_tf_bp
-from model.MSR_tranformer_bp_v10 import msr_tf_bp
+# from model.MSR_tranformer_bp_v7 import msr_tf_bp      #
+# from model.MSR_tranformer_bp_v7 import msr_tf_bp  # only one se module (using dbp_best_w.pth)
 
 # from PPG2BP_Dataset import PPG2BPDataset, use_derivative
 from PPG2BP_Dataset_filter_pulse import PPG2BPDataset, use_derivative
 
-from model.bpnet_cvprw import resnet50
+# from model.bpnet_cvprw import resnet50
 import os
 from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
@@ -159,6 +166,37 @@ def calculate_metrics(array1, array2):
     return mae, std, r_value
 
 
+def BHS_Standard(array1, array2):
+    test_len = len(array1)
+    count_a, count_b, count_c = 0, 0, 0
+    for i in range(test_len):
+        error = np.abs(array1[i] - array2[i])
+        if error <= 5:
+            count_a += 1
+        if error <= 10:
+            count_b += 1
+        if error <= 15:
+            count_c += 1
+
+    return count_a / test_len, count_b / test_len, count_c / test_len
+
+
+def bp_classifier_by_radius(array_hat, array_gt):
+    desired_indices_gt = np.where(array_gt <= 120)
+    desired_indices_hat = np.where(array_hat <= 120)
+    desired_bp_acc = len(np.intersect1d(desired_indices_gt, desired_indices_hat)) / len(desired_indices_gt[0])
+
+    pre_indices_gt = np.where((120 < array_gt) & (array_gt <= 140))
+    pre_indices_hat = np.where((120 < array_hat) & (array_hat <= 140))
+    pre_bp_acc = len(np.intersect1d(pre_indices_gt, pre_indices_hat)) / len(pre_indices_gt[0])
+
+    hy_indices_gt = np.where(140 < array_gt)
+    hy_indices_hat = np.where(140 < array_hat)
+    hy_bp_acc = len(np.intersect1d(hy_indices_gt, hy_indices_hat)) / len(hy_indices_gt[0])
+
+    return desired_bp_acc, pre_bp_acc, hy_bp_acc
+
+
 def evaluate(test_path):
     """ This is my train result """
     bps = []
@@ -177,10 +215,16 @@ def evaluate(test_path):
     map_arr = bps['dbp_arr'] + (bps['sbp_arr'] - bps['dbp_arr']) / 3
     map_hat_arr = bps['dbp_hat_arr'] + (bps['sbp_hat_arr'] - bps['dbp_hat_arr']) / 3
 
+    # desired_bp_acc, pre_bp_acc, hy_bp_acc = bp_classifier_by_radius(sbp_hat_arr, sbp_arr)
+
     # mae, std, rmse, r_value
     sbp_mae, sbp_std, sbp_r_value = calculate_metrics(sbp_hat_arr, sbp_arr)
     dbp_mae, dbp_std, dbp_r_value = calculate_metrics(dbp_hat_arr, dbp_arr)
     map_mae, map_std, map_r_value = calculate_metrics(map_hat_arr, map_arr)
+
+    sbp_a_percen, sbp_b_percen, sbp_c_percen = BHS_Standard(sbp_hat_arr, sbp_arr)
+    dbp_a_percen, dbp_b_percen, dbp_c_percen = BHS_Standard(dbp_hat_arr, dbp_arr)
+    map_a_percen, map_b_percen, map_c_percen = BHS_Standard(map_hat_arr, map_arr)
 
     # plot_coordinates(sbp_arr, sbp_hat_arr, sbp_sd, sbp_mae)
     # plot_coordinates(dbp_arr, dbp_hat_arr, dbp_sd, dbp_mae, sbp=False)
@@ -206,25 +250,42 @@ def evaluate(test_path):
 
     result_metrics = [sbp_mae, sbp_std, sbp_r_value, dbp_mae, dbp_std, dbp_r_value, map_mae, map_std, map_r_value]
 
-    return result_metrics
+    BHS_Standards = [[sbp_a_percen, sbp_b_percen, sbp_c_percen]]
+    BHS_Standards.append([map_a_percen, map_b_percen, map_c_percen])
+    BHS_Standards.append([dbp_a_percen, dbp_b_percen, dbp_c_percen])
+
+    return result_metrics, BHS_Standards
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--batch", type=int, default=4096, help="batch size of training")
     parser.add_argument("-mn", "--model_name", type=str,
-                        # default='best_filter_pulse',
-                        # default='msr_tf_bp_SmoothL1Loss_filter_data_sec_2023121708',
-                        # default='msr_tf_bp_SmoothL1Loss_data_split_2023121709',
-                        # default='msr_tf_bp_SmoothL1Loss_data_split+derivative_2023121801',
+                        # default='best_filter_pulse',  # un
+                        # default='cvpr_no',  # reproduce result
+
+                        # new_data (normal bp value dataset)
+                        # default='cvprw_reproduce_new_data',     # 75 ~ 165 mmHg & 40 ~ 80 mmHg (single channel)
+                        # default='cvpr_normal_data_3_channel',     # 75 ~ 165 mmHg & 40 ~ 80 mmHg (3 channel)
+
+                        # split_date
+                        # default='cvprw_split_data__2023121909',   # new baseline (3 channel)
+                        # default='cvprw_split_data_1_channel',  # new baseline (3 channel)
+
+                        # default='msr_tf_bp_best_dbp_autodl',
                         # default='msr_tf_bp_mse_data_split+derivative_2023121802',
-                        # default='msr_tf_attention_bp_mse_data_split+derivative_2023121908',
-                        default='cvprw_split_data__2023121909',   # new baseline
-                        # default='msr_tf_bp_best_dbp_2023122107'
-                        # default='msr_tf_bp_se__2023122503'
+                        # default='msr_tf_bp_SmoothL1Loss_data_split_2023121709',           # MAE = 10.8591031145226
+                        # default='msr_tf_bp_SmoothL1Loss_data_split+derivative_2023121801',  # MAE = 10.372140880383546
+
+                        # default='MK-Resnet_3 channel',  # MAE = 10.372140880383546
+                        default='ResNet_Transformer_3_channel',  # MAE = 10.372140880383546
+
+                        # default='msr_tf_bp_best_dbp_autodl',
+                        # default='msr_tf_bp_se__2023122503',  # best;  using dbp_best_w.pth
                         # default='msr_tf_bp-se_before pooling_2023122700',  # best
                         help="model to execute")  # vs cvprw
-    parser.add_argument("-m", "--model", type=str, default='cvprw', choices=('msr_tf_bp', 'cvprw'),
+    parser.add_argument("-m", "--model", type=str, default='ResNet_Transformer',
+                        choices=('msr_tf_bp', 'cvprw', 'MK_ResNet', 'ResNet_Transformer'),
                         help="model to execute")
     parser.add_argument('--using_derivative', default=True, help='using derivative of PPG or not')
     parser.add_argument('--loss_func', type=str, default='SmoothL1Loss',
@@ -247,29 +308,47 @@ if __name__ == '__main__':
         model = resnet50(input_c=input_channel, num_classes=2)  # cvprw
     elif opt.model == 'msr_tf_bp':
         model = msr_tf_bp(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)  # ours
+    elif opt.model == "MK_ResNet":
+        model = MK_ResNet(input_channel=input_channel, layers=[1, 1, 1, 1], num_classes=2)  # ours
+    elif opt.model == "ResNet_Transformer":
+        model = resnet50(input_c=3, num_classes=2)  # ours
     else:
         pass
     model = model.to(device)
 
-    "load model"
-    # model.load_state_dict(torch.load('logs/' + opt.model_name + '/dbp_best_w.pth')['state_dict'])
-    model.load_state_dict(torch.load('logs/' + opt.model_name + '/best_w.pth')['state_dict'])
-    best_epoch = torch.load('logs/' + opt.model_name + '/best_w.pth')["epoch"]
     pre_path = os.path.join("predict_test", opt.model_name)
-    os.makedirs(pre_path, exist_ok=True)
-    test_loss = test(model, opt, pre_path)
+    if os.path.exists(pre_path):
 
-    print()
-    # print model name
-    describe = ""
-    print(opt.model_name)
-    print(f"best epoch: {best_epoch}")
-    print(describe)
+        metrics, BHS_Standards = evaluate(pre_path)
+        # metrics.append(test_loss)
+        # print("Test loss:", test_loss)
+        pd.DataFrame(metrics).T.to_csv("evaluate/metric_result.csv", header=False, index=False)
+        pd.DataFrame(np.array(BHS_Standards)).to_csv("evaluate/BHS_Standards.csv", header=False,
+                                                     index=False)
 
-    metrics = evaluate(pre_path)
-    metrics.append(test_loss)
-    print("Test loss:", test_loss)
-    pd.DataFrame(metrics).T.to_csv("evaluate/metric_result.csv", header=False, index=False)
+    else:
+
+        "load model"
+        # model.load_state_dict(torch.load('logs/' + opt.model_name + '/dbp_best_w.pth')['state_dict'])
+        model.load_state_dict(torch.load('logs/' + opt.model_name + '/best_w.pth')['state_dict'])
+        best_epoch = torch.load('logs/' + opt.model_name + '/best_w.pth')["epoch"]
+
+        os.makedirs(pre_path, exist_ok=True)
+        test_loss = test(model, opt, pre_path)
+
+        print()
+        # print model name
+        describe = ""
+        print(opt.model_name)
+        print(f"best epoch: {best_epoch}")
+        print(describe)
+
+        metrics, BHS_Standards = evaluate(pre_path)
+        metrics.append(test_loss)
+        print("Test loss:", test_loss)
+        pd.DataFrame(metrics).T.to_csv("evaluate/metric_result.csv", header=False, index=False)
+        pd.DataFrame(np.array(BHS_Standards)).to_csv("evaluate/BHS_Standards.csv", header=False,
+                                                     index=False)
 
 # tensorboard --logdir=resnet18_202307141720 --port=6007
 # tensorboard --logdir=add_normal_res_18 --port=6007

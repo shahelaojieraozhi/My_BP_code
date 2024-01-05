@@ -18,3 +18,6 @@ The other 12  subjects as  train subject.
 
 The other 4  subjects as  val subject.    
 
+
+Data_refresh.py   
+将血压值范围缩短到: SBP：75 ~ 165 mmHg     DBP: 40 ~ 80 mmHg

@@ -85,6 +85,21 @@ def calculate_metrics(array1, array2):
     return sd, mae, rmse, r_value
 
 
+def BHS_Standard(array1, array2):
+    test_len = len(array1)
+    count_a, count_b, count_c = 0, 0, 0
+    for i in range(test_len):
+        error = np.abs(array1[i] - array2[i])
+        if error <= 5:
+            count_a += 1
+        if error <= 10:
+            count_b += 1
+        if error <= 15:
+            count_c += 1
+
+    return count_a / test_len, count_b / test_len, count_c / test_len
+
+
 if __name__ == '__main__':
 
     """ This is my train result """

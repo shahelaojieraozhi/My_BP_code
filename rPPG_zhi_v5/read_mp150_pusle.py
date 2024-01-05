@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from scipy import signal
 
 
-path = r'sub3.txt'
+path = r'sub_6.txt'
 # 打开文件
 f = open(path, encoding='utf-8')
 # 创建空列表
@@ -42,7 +42,7 @@ for line in lines:
 time = float(len(container) / 1000)
 ECG_resampled = signal.resample(container[:, 0], int(100 * time))
 PPG_resampled = signal.resample(container[:, 1], int(30 * time))
-pd.DataFrame(PPG_resampled).to_csv('PPG_pulse_sub_3.csv', header=False, index=False)
+pd.DataFrame(PPG_resampled).to_csv('PPG_pulse_sub_6.csv', header=False, index=False)
 
 plt.figure(figsize=(10, 6))
 plt.subplot(2, 1, 1)

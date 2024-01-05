@@ -6,28 +6,10 @@
 @File    : MSR_tranformer_bp_v2.py
 @email   : raozhi@mails.cust.edu.cn
 @IDE     ：PyCharm 
-@detail  ：one-se
+
 """
 import torch.nn as nn
 import torch
-
-
-class SELayer(nn.Module):
-    def __init__(self, channel, reduction=16):
-        super(SELayer, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        b, c, _ = x.size()
-        y = self.avg_pool(x).view(b, c)
-        y = self.fc(y).view(b, c, 1)
-        return x * y.expand_as(x)
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -146,8 +128,8 @@ class BasicBlock7x7(nn.Module):
         return out1
 
 
-class  msr_tf_bp(nn.Module):
-    def __init__(self, input_channel, layers=[1, 1, 1, 1], num_classes=10, reduction=16):
+class MK_ResNet(nn.Module):
+    def __init__(self, input_channel, layers=[1, 1, 1, 1], num_classes=10):
         """
         inplanes 是提供给block的通道数，planes表示block的输出通道。
         大家知道，在做残差相加的时候，我们必须保证残差的维度与真正输出的维度相等（注意这里维度是宽高以及深度）这样我们才能把它们堆到一起，所以程序中出现了降采样操作。
@@ -157,15 +139,13 @@ class  msr_tf_bp(nn.Module):
         self.inplanes5 = 64
         self.inplanes7 = 64
 
-        super(msr_tf_bp, self).__init__()
+        super(MK_ResNet, self).__init__()
 
         self.conv1 = nn.Conv1d(input_channel, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
-
-        self.se = SELayer(64, reduction)
 
         self.layer3x3_1 = self._make_layer3(BasicBlock3x3, 64, layers[0], stride=1)
         self.layer3x3_2 = self._make_layer3(BasicBlock3x3, 128, layers[1], stride=2)
@@ -196,19 +176,6 @@ class  msr_tf_bp(nn.Module):
         自适应池化, 对输入信号，提供自适应平均池化操作 对于任何输入大小的输入，可以将输出尺寸指定为H*W， 但是输入和输出特征的数目不会变化。
         """
         self.fc = nn.Linear(256 * 3, num_classes)
-        self.sigmoid = nn.Sigmoid()
-
-        encoder_layer = nn.TransformerEncoderLayer(d_model=256, nhead=8)
-        self.transformerEncoder = nn.TransformerEncoder(encoder_layer, num_layers=3)
-
-        # todo: modify the initialization
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv1d):
-        #         n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-        #         m.weight.data.normal_(0, math.sqrt(2. / n))
-        #     elif isinstance(m, nn.BatchNorm1d):
-        #         m.weight.data.fill_(1)
-        #         m.bias.data.zero_()
 
     def _make_layer3(self, block, planes, blocks, stride=2):
         downsample = None
@@ -267,52 +234,31 @@ class  msr_tf_bp(nn.Module):
         x0 = self.relu(x0)
         x0 = self.maxpool(x0)  # (1024, 64, 219)
 
-        residual = x0
-        x0 = self.se(x0)
-        x0 += residual
-
         x = self.layer3x3_1(x0)  # (1024, 64, 219)
         x = self.layer3x3_2(x)  # (1024, 128, 110)
         x = self.layer3x3_3(x)  # (1024, 256, 55)
-        # x = self.layer3x3_4(x)  # (1024, 512, 28)
-        # x = self.maxpool3(x)  # (1024, 256, 1)
-        x = self.avgpool(x)  # (1024, 256, 1)
+        x = self.avgpool(x)     # (1024, 256, 1)
 
         y = self.layer5x5_1(x0)  # (1024, 64, 215)
         y = self.layer5x5_2(y)  # (1024, 128, 105)
         y = self.layer5x5_3(y)  # (1024, 256, 50)
-        # y = self.layer5x5_4(y)  # (1024, 512, 22)
-        # y = self.maxpool5(y)  # (1024, 256, 1)
-        y = self.avgpool(y)  # (1024, 256, 1)
+        y = self.avgpool(y)     # (1024, 256, 1)
 
         z = self.layer7x7_1(x0)  # (1024, 64, 211)
-        z = self.layer7x7_2(z)  # (1024, 128, 100)
-        z = self.layer7x7_3(z)  # (1024, 256, 44)
-        # z = self.layer7x7_4(z)   # (1024, 512, 16)
-        # z = self.maxpool7(z)   # (1024, 256, 1)
-        z = self.avgpool(z)  # (1024, 256, 1)
+        z = self.layer7x7_2(z)   # (1024, 128, 100)
+        z = self.layer7x7_3(z)   # (1024, 256, 44)
+        z = self.avgpool(z)      # (1024, 256, 1)
 
-        out = torch.cat([x, y, z], dim=2)  # (1024, 256, 3) or # (1024, 512, 3)
-        out = torch.transpose(out, 0, 2)  # (3, 256, 1024)
-        out = torch.transpose(out, 1, 2)  # (3, 1024, 256)
-
-        out = self.transformerEncoder(out)
-        out = torch.transpose(out, 0, 1)  # (1024, 3, 256)
-        out = out.reshape(out.size(0), -1)  # (batch_size, -1)
-
-        # out = torch.cat([x, y, z], dim=1)  # (1024, 768, 1)
-        # out = torch.mean(out, dim=0)        # (5, 64)
-        # out = out.squeeze()  # (1024, 768)
+        out = torch.cat([x, y, z], dim=1).squeeze()  # (1024, 256, 3) or # (1024, 512, 3)
 
         out = self.drop(out)
         out = self.fc(out)  # (1024, 6)
-        # out = self.sigmoid(out)  # (2048, 2)
 
         return out
 
 
 if __name__ == '__main__':
-    msresnet = msr_tf_bp(input_channel=3, layers=[1, 1, 1, 1], num_classes=17)
+    msresnet = MK_ResNet(input_channel=3, layers=[1, 1, 1, 1], num_classes=17)
     inputs = torch.rand(1024, 3, 875)
     outputs = msresnet(inputs)
     print(outputs.size())

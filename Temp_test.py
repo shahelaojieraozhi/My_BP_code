@@ -375,3 +375,16 @@ import torch
 #
 # plt.tight_layout()
 # plt.show()
+
+# def se(x):
+#     return x ** 2
+#
+#
+# y = 5
+#
+# residual_y = y
+# y = se(y)
+# y += residual_y
+# print(y)
+
+

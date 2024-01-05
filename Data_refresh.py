@@ -5,8 +5,7 @@
 @Author  : Rao Zhi
 @File    : Data_refresh.py
 @email   : raozhi@mails.cust.edu.cn
-@IDE     ：PyCharm 
-
+@IDE     ：PyCharm
 """
 import os
 import numpy as np
